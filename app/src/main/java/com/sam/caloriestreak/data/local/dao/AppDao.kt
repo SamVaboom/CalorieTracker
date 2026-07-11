@@ -36,6 +36,9 @@ interface AppDao {
     @Query("SELECT * FROM meal_logs ORDER BY dateEpochDay DESC, timeMillis DESC")
     fun observeMeals(): Flow<List<MealLogEntity>>
 
+    @Query("SELECT * FROM meal_logs ORDER BY dateEpochDay, timeMillis")
+    suspend fun allMeals(): List<MealLogEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMeal(meal: MealLogEntity)
 
@@ -63,6 +66,12 @@ interface AppDao {
     @Query("SELECT * FROM daily_logs ORDER BY dateEpochDay DESC")
     fun observeDailyLogs(): Flow<List<DailyLogEntity>>
 
+    @Query("SELECT * FROM daily_logs ORDER BY dateEpochDay")
+    suspend fun allDailyLogs(): List<DailyLogEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertDailyLog(log: DailyLogEntity)
+
+    @Query("DELETE FROM daily_logs WHERE dateEpochDay >= :day")
+    suspend fun deleteDailyLogsFrom(day: Long)
 }
