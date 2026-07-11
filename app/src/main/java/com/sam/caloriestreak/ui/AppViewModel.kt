@@ -9,9 +9,11 @@ import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
+import com.sam.caloriestreak.domain.calculation.HistoryRebuilder
 import com.sam.caloriestreak.domain.calculation.IngredientCalorieCalculator
 import com.sam.caloriestreak.domain.calculation.RecipeCalorieCalculator
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
+import com.sam.caloriestreak.domain.calculation.StreakCalculator
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +35,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val ingredientDao = database.ingredientDao()
     private val appDao = database.appDao()
     private val scoreCalculator = ScoreCalculator()
+    private val historyRebuilder = HistoryRebuilder(appDao)
     private val targetFlow = MutableStateFlow(1650.0)
+
+    init {
+        viewModelScope.launch { historyRebuilder.rebuild() }
+    }
 
     private val core = combine(
         ingredientDao.observeActive(),
@@ -60,32 +67,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         val todayCalories = data.meals.filter { it.dateEpochDay == LocalDate.now().toEpochDay() }.sumOf { it.calories }
         val score = scoreCalculator.calculate(todayCalories)
-        var current = 0
-        var best = 0
-        var freezes = 0
-        var progress = 0
-        daily.sortedBy { it.dateEpochDay }.forEach { day ->
-            if (day.streakSuccessful || day.freezeUsed) current++ else current = 0
-            best = maxOf(best, current)
-            if (day.freezeQualifying) {
-                progress++
-                if (progress >= 5 && freezes < 3) {
-                    freezes++
-                    progress -= 5
-                }
-            }
-            if (day.freezeUsed && freezes > 0) freezes--
-        }
-        AppUiState(data.ingredients, summaries, data.meals, data.grocery, daily, todayCalories, score,
-            scoreCalculator.status(score), target, current, best, freezes, progress)
+        val streak = StreakCalculator.calculate(daily)
+        AppUiState(
+            ingredients = data.ingredients,
+            recipes = summaries,
+            meals = data.meals,
+            groceryItems = data.grocery,
+            dailyLogs = daily,
+            todayCalories = todayCalories,
+            todayScore = score,
+            status = scoreCalculator.status(score),
+            target = target,
+            currentStreak = streak.current,
+            bestStreak = streak.best,
+            freezes = streak.freezes,
+            freezeProgress = streak.progress
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
 
     fun addIngredient(name: String, calories: Double, referenceAmount: Double, unit: String) {
-        if (name.isBlank() || calories < 0 || referenceAmount <= 0) return
+        if (name.isBlank() || calories < 0 || referenceAmount <= 0 || unit.isBlank()) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            ingredientDao.upsert(IngredientEntity(UUID.randomUUID().toString(), name.trim(), calories = calories,
-                referenceAmount = referenceAmount, referenceUnit = unit, createdAt = now, updatedAt = now))
+            ingredientDao.upsert(
+                IngredientEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = name.trim(),
+                    calories = calories,
+                    referenceAmount = referenceAmount,
+                    referenceUnit = unit.trim(),
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
         }
     }
 
@@ -96,17 +110,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val recipeId = UUID.randomUUID().toString()
-            appDao.upsertRecipe(RecipeEntity(recipeId, name.trim(), servings = servings, createdAt = now, updatedAt = now))
-            appDao.upsertRecipeItems(selected.filter { it.second > 0 }.map { (ingredient, amount) ->
-                RecipeItemEntity(UUID.randomUUID().toString(), recipeId, ingredient.id, ingredient.name, amount, ingredient.referenceUnit)
-            })
+            appDao.upsertRecipe(
+                RecipeEntity(recipeId, name.trim(), servings = servings, createdAt = now, updatedAt = now)
+            )
+            appDao.upsertRecipeItems(
+                selected.filter { it.second > 0 }.map { (ingredient, amount) ->
+                    RecipeItemEntity(
+                        UUID.randomUUID().toString(),
+                        recipeId,
+                        ingredient.id,
+                        ingredient.name,
+                        amount,
+                        ingredient.referenceUnit
+                    )
+                }
+            )
         }
     }
 
     fun logRecipe(summary: RecipeSummary, multiplier: Double, description: String) {
         if (multiplier <= 0) return
-        saveMeal(summary.recipe.id, summary.recipe.name, description, multiplier,
-            RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier))
+        saveMeal(
+            recipeId = summary.recipe.id,
+            name = summary.recipe.name,
+            portion = description,
+            multiplier = multiplier,
+            calories = RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier)
+        )
     }
 
     fun logManual(description: String, calories: Double) {
@@ -117,23 +147,51 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun saveMeal(recipeId: String?, name: String, portion: String, multiplier: Double, calories: Double) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            appDao.upsertMeal(MealLogEntity(UUID.randomUUID().toString(), LocalDate.now().toEpochDay(), now,
-                recipeId, name, portion, multiplier, calories, createdAt = now, updatedAt = now))
+            appDao.upsertMeal(
+                MealLogEntity(
+                    id = UUID.randomUUID().toString(),
+                    dateEpochDay = LocalDate.now().toEpochDay(),
+                    timeMillis = now,
+                    recipeId = recipeId,
+                    recipeName = name,
+                    portionDescription = portion,
+                    portionMultiplier = multiplier,
+                    calories = calories,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
         }
     }
 
-    fun deleteMeal(meal: MealLogEntity) = viewModelScope.launch { appDao.deleteMeal(meal) }
+    fun deleteMeal(meal: MealLogEntity) = viewModelScope.launch {
+        appDao.deleteMeal(meal)
+        historyRebuilder.rebuild()
+    }
 
     fun generateGrocery(summary: RecipeSummary, multiplier: Double) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            appDao.upsertGroceryItems(summary.items.map { item ->
-                GroceryItemEntity(UUID.randomUUID().toString(), item.ingredientId, item.ingredientName,
-                    item.amount * multiplier, item.unit, createdAt = now)
-            })
+            val existing = state.value.groceryItems
+            val additions = summary.items.map { item ->
+                val match = existing.firstOrNull { it.ingredientId == item.ingredientId && it.unit == item.unit }
+                GroceryItemEntity(
+                    id = match?.id ?: UUID.randomUUID().toString(),
+                    ingredientId = item.ingredientId,
+                    name = item.ingredientName,
+                    amount = (match?.amount ?: 0.0) + item.amount * multiplier,
+                    unit = item.unit,
+                    checked = match?.checked ?: false,
+                    createdAt = match?.createdAt ?: now
+                )
+            }
+            appDao.upsertGroceryItems(additions)
         }
     }
 
-    fun toggleGrocery(item: GroceryItemEntity) = viewModelScope.launch { appDao.updateGroceryItem(item.copy(checked = !item.checked)) }
+    fun toggleGrocery(item: GroceryItemEntity) = viewModelScope.launch {
+        appDao.updateGroceryItem(item.copy(checked = !item.checked))
+    }
+
     fun clearGrocery() = viewModelScope.launch { appDao.clearGroceryItems() }
 }
