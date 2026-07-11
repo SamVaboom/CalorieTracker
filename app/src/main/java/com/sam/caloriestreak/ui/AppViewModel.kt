@@ -20,6 +20,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+private data class CoreData(
+    val ingredients: List<IngredientEntity>,
+    val recipes: List<RecipeEntity>,
+    val items: List<RecipeItemEntity>,
+    val meals: List<MealLogEntity>,
+    val grocery: List<GroceryItemEntity>
+)
+
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val database = DatabaseProvider.get(application)
     private val ingredientDao = database.ingredientDao()
@@ -27,19 +35,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val scoreCalculator = ScoreCalculator()
     private val targetFlow = MutableStateFlow(1650.0)
 
-    val state = combine(
+    private val core = combine(
         ingredientDao.observeActive(),
         appDao.observeRecipes(),
         appDao.observeRecipeItems(),
         appDao.observeMeals(),
-        appDao.observeGroceryItems(),
-        appDao.observeDailyLogs(),
-        targetFlow
-    ) { ingredients, recipes, items, meals, grocery, daily, target ->
-        val summaries = recipes.map { recipe ->
-            val recipeItems = items.filter { it.recipeId == recipe.id }
+        appDao.observeGroceryItems()
+    ) { ingredients, recipes, items, meals, grocery ->
+        CoreData(ingredients, recipes, items, meals, grocery)
+    }
+
+    val state = combine(core, appDao.observeDailyLogs(), targetFlow) { data, daily, target ->
+        val summaries = data.recipes.map { recipe ->
+            val recipeItems = data.items.filter { it.recipeId == recipe.id }
             val total = recipeItems.sumOf { item ->
-                val ingredient = ingredients.firstOrNull { it.id == item.ingredientId }
+                val ingredient = data.ingredients.firstOrNull { it.id == item.ingredientId }
                 if (ingredient == null) 0.0 else IngredientCalorieCalculator.calories(
                     ingredient.calories,
                     ingredient.referenceAmount,
@@ -48,17 +58,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             RecipeSummary(recipe, recipeItems, total, RecipeCalorieCalculator.perServing(total, recipe.servings))
         }
-        val today = LocalDate.now().toEpochDay()
-        val todayCalories = meals.filter { it.dateEpochDay == today }.sumOf { it.calories }
+        val todayCalories = data.meals.filter { it.dateEpochDay == LocalDate.now().toEpochDay() }.sumOf { it.calories }
         val score = scoreCalculator.calculate(todayCalories)
-        val finalized = daily.sortedBy { it.dateEpochDay }
         var current = 0
         var best = 0
         var freezes = 0
         var progress = 0
-        finalized.forEach { day ->
+        daily.sortedBy { it.dateEpochDay }.forEach { day ->
             if (day.streakSuccessful || day.freezeUsed) current++ else current = 0
-            if (current > best) best = current
+            best = maxOf(best, current)
             if (day.freezeQualifying) {
                 progress++
                 if (progress >= 5 && freezes < 3) {
@@ -68,35 +76,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (day.freezeUsed && freezes > 0) freezes--
         }
-        AppUiState(
-            ingredients = ingredients,
-            recipes = summaries,
-            meals = meals,
-            groceryItems = grocery,
-            dailyLogs = daily,
-            todayCalories = todayCalories,
-            todayScore = score,
-            status = scoreCalculator.status(score),
-            target = target,
-            currentStreak = current,
-            bestStreak = best,
-            freezes = freezes,
-            freezeProgress = progress
-        )
+        AppUiState(data.ingredients, summaries, data.meals, data.grocery, daily, todayCalories, score,
+            scoreCalculator.status(score), target, current, best, freezes, progress)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
 
     fun addIngredient(name: String, calories: Double, referenceAmount: Double, unit: String) {
         if (name.isBlank() || calories < 0 || referenceAmount <= 0) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            ingredientDao.upsert(IngredientEntity(UUID.randomUUID().toString(), name.trim(), calories = calories, referenceAmount = referenceAmount, referenceUnit = unit, createdAt = now, updatedAt = now))
+            ingredientDao.upsert(IngredientEntity(UUID.randomUUID().toString(), name.trim(), calories = calories,
+                referenceAmount = referenceAmount, referenceUnit = unit, createdAt = now, updatedAt = now))
         }
     }
 
     fun deleteIngredient(ingredient: IngredientEntity) = viewModelScope.launch { ingredientDao.delete(ingredient) }
 
     fun addRecipe(name: String, servings: Double, selected: List<Pair<IngredientEntity, Double>>) {
-        if (name.isBlank() || servings <= 0 || selected.isEmpty()) return
+        if (name.isBlank() || servings <= 0 || selected.none { it.second > 0 }) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val recipeId = UUID.randomUUID().toString()
@@ -109,8 +105,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logRecipe(summary: RecipeSummary, multiplier: Double, description: String) {
         if (multiplier <= 0) return
-        val calories = RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier)
-        saveMeal(summary.recipe.id, summary.recipe.name, description, multiplier, calories)
+        saveMeal(summary.recipe.id, summary.recipe.name, description, multiplier,
+            RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier))
     }
 
     fun logManual(description: String, calories: Double) {
@@ -121,7 +117,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun saveMeal(recipeId: String?, name: String, portion: String, multiplier: Double, calories: Double) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            appDao.upsertMeal(MealLogEntity(UUID.randomUUID().toString(), LocalDate.now().toEpochDay(), now, recipeId, name, portion, multiplier, calories, createdAt = now, updatedAt = now))
+            appDao.upsertMeal(MealLogEntity(UUID.randomUUID().toString(), LocalDate.now().toEpochDay(), now,
+                recipeId, name, portion, multiplier, calories, createdAt = now, updatedAt = now))
         }
     }
 
@@ -130,10 +127,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun generateGrocery(summary: RecipeSummary, multiplier: Double) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val newItems = summary.items.map { item ->
-                GroceryItemEntity(UUID.randomUUID().toString(), item.ingredientId, item.ingredientName, item.amount * multiplier, item.unit, createdAt = now)
-            }
-            appDao.upsertGroceryItems(newItems)
+            appDao.upsertGroceryItems(summary.items.map { item ->
+                GroceryItemEntity(UUID.randomUUID().toString(), item.ingredientId, item.ingredientName,
+                    item.amount * multiplier, item.unit, createdAt = now)
+            })
         }
     }
 
