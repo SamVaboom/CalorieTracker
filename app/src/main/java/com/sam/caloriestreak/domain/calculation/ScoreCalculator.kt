@@ -2,16 +2,13 @@ package com.sam.caloriestreak.domain.calculation
 
 data class ScorePoint(val calories: Double, val score: Double)
 
-class ScoreCalculator(
-    points: List<ScorePoint> = defaultPoints
-) {
+class ScoreCalculator(points: List<ScorePoint> = defaultPoints) {
     private val curve = points.sortedBy { it.calories }
 
     fun calculate(calories: Double): Double {
         require(curve.size >= 2) { "At least two score points are required" }
         if (calories <= curve.first().calories) return curve.first().score.coerceIn(0.0, 100.0)
         if (calories >= curve.last().calories) return curve.last().score.coerceIn(0.0, 100.0)
-
         val pair = curve.zipWithNext().first { (left, right) -> calories in left.calories..right.calories }
         val ratio = (calories - pair.first.calories) / (pair.second.calories - pair.first.calories)
         return (pair.first.score + ratio * (pair.second.score - pair.first.score)).coerceIn(0.0, 100.0)
@@ -19,7 +16,8 @@ class ScoreCalculator(
 
     fun status(score: Double): String = when {
         score < 40.0 -> "Bad"
-        score < 80.0 -> "Okay"
+        score < 80.0 -> "Poor"
+        score < 85.0 -> "Streak safe"
         score < 95.0 -> "Good"
         else -> "Excellent"
     }
