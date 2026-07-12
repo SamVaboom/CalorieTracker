@@ -45,7 +45,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val core = combine(
-        ingredientDao.observeActive(),
+        ingredientDao.observeAll(),
         appDao.observeRecipes(),
         appDao.observeRecipeItems(),
         appDao.observeMeals(),
@@ -75,7 +75,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val effectiveScore = FreezeTodayPolicy.effectiveScore(actualScore, todayFrozen)
         val streak = StreakCalculator.calculate(daily)
         AppUiState(
-            ingredients = data.ingredients,
+            ingredients = data.ingredients.filterNot { it.archived },
             recipes = summaries,
             meals = data.meals,
             groceryItems = data.grocery,
