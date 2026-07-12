@@ -72,11 +72,10 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
         NavHost(navController, startDestination = "dashboard", modifier = Modifier.padding(padding)) {
             composable("dashboard") {
                 DashboardScreen(
-                    state,
-                    onLogFood = { navController.navigate("log") },
-                    onIngredients = { navController.navigate("ingredients") },
+                    state = state,
                     onHistory = { navController.navigate("history") },
                     onStatistics = { navController.navigate("statistics") },
+                    onFreezeToday = appViewModel::freezeToday,
                     onDeleteMeal = appViewModel::deleteMeal
                 )
             }
