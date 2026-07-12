@@ -18,6 +18,7 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - name: Run Gradle tests
+        id: gradle-tests
         shell: bash
         run: |
           set +e
@@ -29,3 +30,10 @@ jobs:
             exit "$status"
           fi
           echo "Gradle tests passed"
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-test-log
+          path: gradle-test.log
+          retention-days: 3
