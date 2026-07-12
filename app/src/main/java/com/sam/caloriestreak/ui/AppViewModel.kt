@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sam.caloriestreak.data.local.database.DatabaseProvider
+import com.sam.caloriestreak.data.local.entity.DailyLogEntity
 import com.sam.caloriestreak.data.local.entity.GroceryItemEntity
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
+import com.sam.caloriestreak.domain.calculation.FreezeTodayPolicy
 import com.sam.caloriestreak.domain.calculation.HistoryRebuilder
 import com.sam.caloriestreak.domain.calculation.IngredientCalorieCalculator
 import com.sam.caloriestreak.domain.calculation.RecipeCalorieCalculator
@@ -65,8 +67,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             RecipeSummary(recipe, recipeItems, total, RecipeCalorieCalculator.perServing(total, recipe.servings))
         }
-        val todayCalories = data.meals.filter { it.dateEpochDay == LocalDate.now().toEpochDay() }.sumOf { it.calories }
-        val score = scoreCalculator.calculate(todayCalories)
+        val today = LocalDate.now().toEpochDay()
+        val todayCalories = data.meals.filter { it.dateEpochDay == today }.sumOf { it.calories }
+        val actualScore = scoreCalculator.calculate(todayCalories)
+        val todayRecord = daily.firstOrNull { it.dateEpochDay == today }
+        val todayFrozen = todayRecord?.manualCheatDay == true && todayRecord.freezeUsed
+        val effectiveScore = FreezeTodayPolicy.effectiveScore(actualScore, todayFrozen)
         val streak = StreakCalculator.calculate(daily)
         AppUiState(
             ingredients = data.ingredients,
@@ -75,8 +81,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             groceryItems = data.grocery,
             dailyLogs = daily,
             todayCalories = todayCalories,
-            todayScore = score,
-            status = scoreCalculator.status(score),
+            todayScore = actualScore,
+            todayEffectiveScore = effectiveScore,
+            todayFrozen = todayFrozen,
+            status = if (todayFrozen) "Freeze active" else scoreCalculator.status(actualScore),
             target = target,
             currentStreak = streak.current,
             bestStreak = streak.best,
@@ -103,7 +111,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun deleteIngredient(ingredient: IngredientEntity) = viewModelScope.launch { ingredientDao.delete(ingredient) }
+    fun deleteIngredient(ingredient: IngredientEntity) = viewModelScope.launch {
+        val isUsed = state.value.recipes.any { summary ->
+            summary.items.any { it.ingredientId == ingredient.id }
+        }
+        if (isUsed) {
+            ingredientDao.upsert(ingredient.copy(archived = true, updatedAt = System.currentTimeMillis()))
+        } else {
+            ingredientDao.delete(ingredient)
+        }
+    }
 
     fun addRecipe(name: String, servings: Double, selected: List<Pair<IngredientEntity, Double>>) {
         if (name.isBlank() || servings <= 0 || selected.none { it.second > 0 }) return
@@ -161,12 +178,55 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     updatedAt = now
                 )
             )
+            syncTodayOverride()
         }
     }
 
     fun deleteMeal(meal: MealLogEntity) = viewModelScope.launch {
         appDao.deleteMeal(meal)
+        syncTodayOverride()
         historyRebuilder.rebuild()
+    }
+
+    fun freezeToday() = viewModelScope.launch {
+        val day = LocalDate.now().toEpochDay()
+        val existing = appDao.dailyLogForDay(day)
+        val alreadyFrozen = existing?.manualCheatDay == true || existing?.freezeUsed == true
+        if (!FreezeTodayPolicy.canUseFreeze(state.value.freezes, alreadyFrozen)) return@launch
+
+        val now = System.currentTimeMillis()
+        val total = appDao.totalForDay(day)
+        val actualScore = scoreCalculator.calculate(total)
+        appDao.upsertDailyLog(
+            DailyLogEntity(
+                dateEpochDay = day,
+                totalCalories = total,
+                score = actualScore,
+                finalized = false,
+                streakSuccessful = false,
+                freezeUsed = true,
+                manualCheatDay = true,
+                freezeQualifying = FreezeTodayPolicy.qualifiesForProgress(actualScore),
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now
+            )
+        )
+    }
+
+    private suspend fun syncTodayOverride() {
+        val day = LocalDate.now().toEpochDay()
+        val existing = appDao.dailyLogForDay(day) ?: return
+        if (existing.finalized) return
+        val total = appDao.totalForDay(day)
+        val score = scoreCalculator.calculate(total)
+        appDao.upsertDailyLog(
+            existing.copy(
+                totalCalories = total,
+                score = score,
+                freezeQualifying = FreezeTodayPolicy.qualifiesForProgress(score),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
     }
 
     fun generateGrocery(summary: RecipeSummary, multiplier: Double) {
