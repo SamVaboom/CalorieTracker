@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface IngredientDao {
+    @Query("SELECT * FROM ingredients ORDER BY favorite DESC, name ASC")
+    fun observeAll(): Flow<List<IngredientEntity>>
+
     @Query("SELECT * FROM ingredients WHERE archived = 0 ORDER BY favorite DESC, name ASC")
     fun observeActive(): Flow<List<IngredientEntity>>
 
