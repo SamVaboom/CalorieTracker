@@ -13,7 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.ui.AppUiState
+import com.sam.caloriestreak.ui.components.MealLogRow
+import java.time.LocalDate
 
 @Composable
 fun DashboardScreen(
@@ -21,9 +24,14 @@ fun DashboardScreen(
     onLogFood: () -> Unit,
     onIngredients: () -> Unit,
     onHistory: () -> Unit,
-    onStatistics: () -> Unit
+    onStatistics: () -> Unit,
+    onDeleteMeal: (MealLogEntity) -> Unit
 ) {
-    LazyColumn(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val todayMeals = state.meals.filter { it.dateEpochDay == LocalDate.now().toEpochDay() }
+    LazyColumn(
+        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         item {
             Text("Today: ${state.todayCalories.toInt()} kcal")
             Text("Score: ${state.todayScore.toInt()}% · ${state.status}")
@@ -53,12 +61,11 @@ fun DashboardScreen(
             }
         }
         item { Text("Today's meals") }
-        items(state.meals.filter { it.dateEpochDay == java.time.LocalDate.now().toEpochDay() }) { meal ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(meal.recipeName)
-                    Text("${meal.portionDescription} · ${meal.calories.toInt()} kcal")
-                }
+        if (todayMeals.isEmpty()) {
+            item { Text("No food logged yet.") }
+        } else {
+            items(todayMeals, key = { it.id }) { meal ->
+                MealLogRow(meal = meal, onDelete = onDeleteMeal)
             }
         }
     }
