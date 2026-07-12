@@ -189,6 +189,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun addIngredientToGrocery(ingredient: IngredientEntity) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val existing = state.value.groceryItems.firstOrNull {
+                it.ingredientId == ingredient.id && it.unit == ingredient.referenceUnit
+            }
+            appDao.upsertGroceryItems(
+                listOf(
+                    GroceryItemEntity(
+                        id = existing?.id ?: UUID.randomUUID().toString(),
+                        ingredientId = ingredient.id,
+                        name = ingredient.name,
+                        amount = (existing?.amount ?: 0.0) + ingredient.referenceAmount,
+                        unit = ingredient.referenceUnit,
+                        checked = existing?.checked ?: false,
+                        createdAt = existing?.createdAt ?: now
+                    )
+                )
+            )
+        }
+    }
+
     fun toggleGrocery(item: GroceryItemEntity) = viewModelScope.launch {
         appDao.updateGroceryItem(item.copy(checked = !item.checked))
     }
