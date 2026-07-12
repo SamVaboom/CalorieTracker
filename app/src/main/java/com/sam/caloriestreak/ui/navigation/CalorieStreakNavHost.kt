@@ -70,7 +70,8 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
                     onLogFood = { navController.navigate("log") },
                     onIngredients = { navController.navigate("ingredients") },
                     onHistory = { navController.navigate("history") },
-                    onStatistics = { navController.navigate("statistics") }
+                    onStatistics = { navController.navigate("statistics") },
+                    onDeleteMeal = appViewModel::deleteMeal
                 )
             }
             composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual) }
