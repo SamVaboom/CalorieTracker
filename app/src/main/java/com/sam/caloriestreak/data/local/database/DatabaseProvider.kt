@@ -1,0 +1,30 @@
+package com.sam.caloriestreak.data.local.database
+
+import android.content.Context
+import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+object DatabaseProvider {
+    private val migration1To2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS recipes (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, description TEXT, servings REAL NOT NULL, favorite INTEGER NOT NULL, archived INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS recipe_items (id TEXT NOT NULL PRIMARY KEY, recipeId TEXT NOT NULL, ingredientId TEXT NOT NULL, ingredientName TEXT NOT NULL, amount REAL NOT NULL, unit TEXT NOT NULL, note TEXT)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_recipe_items_recipeId ON recipe_items(recipeId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_recipe_items_ingredientId ON recipe_items(ingredientId)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS meal_logs (id TEXT NOT NULL PRIMARY KEY, dateEpochDay INTEGER NOT NULL, timeMillis INTEGER NOT NULL, recipeId TEXT, recipeName TEXT NOT NULL, portionDescription TEXT NOT NULL, portionMultiplier REAL NOT NULL, calories REAL NOT NULL, note TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_meal_logs_dateEpochDay ON meal_logs(dateEpochDay)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS grocery_items (id TEXT NOT NULL PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, amount REAL NOT NULL, unit TEXT NOT NULL, checked INTEGER NOT NULL, manuallyAdded INTEGER NOT NULL, createdAt INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS daily_logs (dateEpochDay INTEGER NOT NULL PRIMARY KEY, totalCalories REAL NOT NULL, score REAL NOT NULL, finalized INTEGER NOT NULL, streakSuccessful INTEGER NOT NULL, freezeUsed INTEGER NOT NULL, manualCheatDay INTEGER NOT NULL, freezeQualifying INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+        }
+    }
+
+    @Volatile private var instance: CalorieStreakDatabase? = null
+
+    fun get(context: Context): CalorieStreakDatabase = instance ?: synchronized(this) {
+        instance ?: Room.databaseBuilder(context.applicationContext, CalorieStreakDatabase::class.java, "calorie_streak.db")
+            .addMigrations(migration1To2)
+            .build()
+            .also { instance = it }
+    }
+}
