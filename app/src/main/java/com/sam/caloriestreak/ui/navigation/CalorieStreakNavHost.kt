@@ -48,7 +48,13 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
             items.forEachIndexed { index, item ->
                 NavigationBarItem(
                     selected = entry?.destination?.hierarchy?.any { it.route == item.route } == true,
-                    onClick = { navController.navigate(item.route) { launchSingleTop = true } },
+                    onClick = {
+                        navController.navigate(item.route) {
+                            launchSingleTop = true
+                            restoreState = true
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        }
+                    },
                     icon = {
                         val icon = when (index) {
                             0 -> Icons.Default.Dashboard
@@ -74,10 +80,41 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
                     onDeleteMeal = appViewModel::deleteMeal
                 )
             }
-            composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual) }
-            composable("recipes") { RecipesScreen(state.ingredients, state.recipes, appViewModel::addRecipe) }
-            composable("grocery") { GroceryScreen(state.recipes, state.groceryItems, appViewModel::generateGrocery, appViewModel::toggleGrocery, appViewModel::clearGrocery) }
-            composable("ingredients") { IngredientsScreen(state.ingredients, appViewModel::addIngredient, appViewModel::deleteIngredient) }
+            composable("log") {
+                LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual)
+            }
+            composable("recipes") {
+                RecipesScreen(
+                    ingredients = state.ingredients,
+                    recipes = state.recipes,
+                    onAdd = appViewModel::addRecipe,
+                    onOpenIngredients = { navController.navigate("ingredients") { launchSingleTop = true } }
+                )
+            }
+            composable("grocery") {
+                GroceryScreen(
+                    recipes = state.recipes,
+                    ingredients = state.ingredients,
+                    items = state.groceryItems,
+                    onGenerate = appViewModel::generateGrocery,
+                    onAddIngredient = appViewModel::addIngredientToGrocery,
+                    onToggle = appViewModel::toggleGrocery,
+                    onClear = appViewModel::clearGrocery
+                )
+            }
+            composable("ingredients") {
+                IngredientsScreen(
+                    ingredients = state.ingredients,
+                    onAdd = appViewModel::addIngredient,
+                    onDelete = appViewModel::deleteIngredient,
+                    onOpenRecipes = {
+                        navController.navigate("recipes") {
+                            launchSingleTop = true
+                            popUpTo("recipes") { inclusive = false }
+                        }
+                    }
+                )
+            }
             composable("history") { HistoryScreen(state.meals, appViewModel::deleteMeal) }
             composable("statistics") { StatisticsScreen(state.meals, state.currentStreak, state.bestStreak) }
         }
