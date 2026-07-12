@@ -72,6 +72,6 @@ object HistorySeriesBuilder {
     fun hasTrackedData(points: List<HistoryPoint>, dailyLogs: List<DailyLogEntity>): Boolean {
         if (points.isEmpty()) return false
         val days = points.mapTo(mutableSetOf()) { it.epochDay }
-        return points.any { it.hasMealData } || dailyLogs.any { it.epochDay in days }
+        return points.any { it.hasMealData } || dailyLogs.any { it.dateEpochDay in days }
     }
 }
