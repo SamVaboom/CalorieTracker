@@ -115,7 +115,14 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
                     }
                 )
             }
-            composable("history") { HistoryScreen(state.meals, appViewModel::deleteMeal) }
+            composable("history") {
+                HistoryScreen(
+                    meals = state.meals,
+                    dailyLogs = state.dailyLogs,
+                    targetCalories = state.target,
+                    onDelete = appViewModel::deleteMeal
+                )
+            }
             composable("statistics") { StatisticsScreen(state.meals, state.currentStreak, state.bestStreak) }
         }
     }
