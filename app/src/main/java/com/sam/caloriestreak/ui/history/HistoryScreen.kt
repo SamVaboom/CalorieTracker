@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.DailyLogEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
+import com.sam.caloriestreak.domain.history.HistoryGraphDefaults
 import com.sam.caloriestreak.domain.history.HistoryMetric
 import com.sam.caloriestreak.domain.history.HistoryRange
 import com.sam.caloriestreak.domain.history.HistorySeriesBuilder
@@ -43,8 +44,8 @@ fun HistoryScreen(
     onDelete: (MealLogEntity) -> Unit
 ) {
     var mode by rememberSaveable { mutableStateOf(HistoryMode.LIST) }
-    var metric by rememberSaveable { mutableStateOf(HistoryMetric.SCORE) }
-    var range by rememberSaveable { mutableStateOf(HistoryRange.WEEK) }
+    var metric by rememberSaveable { mutableStateOf(HistoryGraphDefaults.metric) }
+    var range by rememberSaveable { mutableStateOf(HistoryGraphDefaults.range) }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
