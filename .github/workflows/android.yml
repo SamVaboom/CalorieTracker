@@ -17,4 +17,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - run: gradle test
+      - name: Run Gradle tests
+        run: gradle test --console=plain
