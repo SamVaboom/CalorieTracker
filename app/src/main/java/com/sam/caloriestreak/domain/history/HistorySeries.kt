@@ -16,6 +16,11 @@ enum class HistoryRange(val label: String, val dayCount: Long?) {
     ALL("All time", null)
 }
 
+object HistoryGraphDefaults {
+    val metric = HistoryMetric.SCORE
+    val range = HistoryRange.WEEK
+}
+
 data class HistoryPoint(
     val epochDay: Long,
     val calories: Double,
