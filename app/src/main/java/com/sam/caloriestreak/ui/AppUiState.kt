@@ -21,7 +21,11 @@ data class AppUiState(
     val groceryItems: List<GroceryItemEntity> = emptyList(),
     val dailyLogs: List<DailyLogEntity> = emptyList(),
     val todayCalories: Double = 0.0,
+    /** Actual calorie-curve score. Never replaced by a freeze. */
     val todayScore: Double = 0.0,
+    /** Score used for the dashboard/streak presentation. 100% while Freeze Today is active. */
+    val todayEffectiveScore: Double = 0.0,
+    val todayFrozen: Boolean = false,
     val status: String = "Bad",
     val target: Double = 1650.0,
     val currentStreak: Int = 0,
