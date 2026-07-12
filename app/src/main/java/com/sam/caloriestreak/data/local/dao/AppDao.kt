@@ -66,6 +66,9 @@ interface AppDao {
     @Query("SELECT * FROM daily_logs ORDER BY dateEpochDay DESC")
     fun observeDailyLogs(): Flow<List<DailyLogEntity>>
 
+    @Query("SELECT * FROM daily_logs WHERE dateEpochDay = :day LIMIT 1")
+    suspend fun dailyLogForDay(day: Long): DailyLogEntity?
+
     @Query("SELECT * FROM daily_logs ORDER BY dateEpochDay")
     suspend fun allDailyLogs(): List<DailyLogEntity>
 
