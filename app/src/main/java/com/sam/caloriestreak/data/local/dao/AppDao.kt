@@ -72,6 +72,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertDailyLog(log: DailyLogEntity)
 
+    @Query("DELETE FROM daily_logs WHERE finalized = 1")
+    suspend fun deleteFinalizedDailyLogs()
+
     @Query("DELETE FROM daily_logs WHERE dateEpochDay >= :day")
     suspend fun deleteDailyLogsFrom(day: Long)
 }
