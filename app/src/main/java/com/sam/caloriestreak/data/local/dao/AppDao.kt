@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.sam.caloriestreak.data.local.entity.DailyLogEntity
 import com.sam.caloriestreak.data.local.entity.GroceryItemEntity
@@ -18,6 +19,9 @@ interface AppDao {
     @Query("SELECT * FROM recipes WHERE archived = 0 ORDER BY favorite DESC, name")
     fun observeRecipes(): Flow<List<RecipeEntity>>
 
+    @Query("SELECT * FROM recipes ORDER BY favorite DESC, archived ASC, name")
+    fun observeAllRecipes(): Flow<List<RecipeEntity>>
+
     @Query("SELECT * FROM recipe_items ORDER BY ingredientName")
     fun observeRecipeItems(): Flow<List<RecipeItemEntity>>
 
@@ -29,6 +33,16 @@ interface AppDao {
 
     @Query("DELETE FROM recipe_items WHERE recipeId = :recipeId")
     suspend fun deleteRecipeItems(recipeId: String)
+
+    @Transaction
+    suspend fun replaceRecipe(recipe: RecipeEntity, items: List<RecipeItemEntity>) {
+        upsertRecipe(recipe)
+        deleteRecipeItems(recipe.id)
+        if (items.isNotEmpty()) upsertRecipeItems(items)
+    }
+
+    @Query("SELECT COUNT(*) FROM recipe_items WHERE ingredientId = :ingredientId")
+    suspend fun recipeUseCount(ingredientId: String): Int
 
     @Delete
     suspend fun deleteRecipe(recipe: RecipeEntity)
