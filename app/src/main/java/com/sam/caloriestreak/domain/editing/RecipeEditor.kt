@@ -31,6 +31,17 @@ data class RecipeDraft(
         }
     }
 
+    fun hasSameContent(other: RecipeDraft): Boolean {
+        fun RecipeDraft.normalized() = copy(
+            name = name.trim(),
+            description = description.trim(),
+            items = items.map {
+                it.copy(unit = it.unit.trim(), note = it.note.trim())
+            }.sortedBy { it.ingredientId }
+        )
+        return normalized() == other.normalized()
+    }
+
     fun totalCalories(ingredients: List<IngredientEntity>): Double {
         val ingredientMap = ingredients.associateBy { it.id }
         return items.sumOf { item ->
