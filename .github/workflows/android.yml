@@ -18,4 +18,12 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - name: Run Gradle tests
-        run: gradle test --console=plain
+        run: |
+          set -o pipefail
+          gradle test --console=plain 2>&1 | tee gradle-test.log
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-editing-test-log
+          path: gradle-test.log
