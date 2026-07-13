@@ -6,6 +6,7 @@ import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
+import com.sam.caloriestreak.domain.calculation.StreakRules
 
 data class RecipeSummary(
     val recipe: RecipeEntity,
@@ -16,7 +17,9 @@ data class RecipeSummary(
 
 data class AppUiState(
     val ingredients: List<IngredientEntity> = emptyList(),
+    val allIngredients: List<IngredientEntity> = emptyList(),
     val recipes: List<RecipeSummary> = emptyList(),
+    val allRecipes: List<RecipeSummary> = emptyList(),
     val meals: List<MealLogEntity> = emptyList(),
     val groceryItems: List<GroceryItemEntity> = emptyList(),
     val dailyLogs: List<DailyLogEntity> = emptyList(),
@@ -31,5 +34,6 @@ data class AppUiState(
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val freezes: Int = 0,
-    val freezeProgress: Int = 0
+    val freezeProgress: Int = 0,
+    val freezeRequiredDays: Int = StreakRules.FREEZE_REQUIRED_DAYS
 )
