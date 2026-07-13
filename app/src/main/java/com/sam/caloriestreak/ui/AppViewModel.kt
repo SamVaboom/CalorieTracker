@@ -10,12 +10,14 @@ import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
+import com.sam.caloriestreak.data.settings.SettingsStore
 import com.sam.caloriestreak.domain.calculation.FreezeTodayPolicy
 import com.sam.caloriestreak.domain.calculation.HistoryRebuilder
 import com.sam.caloriestreak.domain.calculation.IngredientCalorieCalculator
 import com.sam.caloriestreak.domain.calculation.RecipeCalorieCalculator
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
 import com.sam.caloriestreak.domain.calculation.StreakCalculator
+import com.sam.caloriestreak.domain.calculation.StreakRules
 import com.sam.caloriestreak.domain.editing.IngredientDraft
 import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.domain.editing.RecipeIngredientDraft
@@ -40,12 +42,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val database = DatabaseProvider.get(application)
     private val ingredientDao = database.ingredientDao()
     private val appDao = database.appDao()
+    private val settingsStore = SettingsStore(application)
     private val scoreCalculator = ScoreCalculator()
     private val historyRebuilder = HistoryRebuilder(appDao)
     private val targetFlow = MutableStateFlow(1650.0)
 
     init {
-        viewModelScope.launch { historyRebuilder.rebuild() }
+        viewModelScope.launch {
+            // Preserve the inventory and numeric progress earned under the previous five-day rule.
+            // Only finalized dates after this cutoff use the new seven-day earning requirement.
+            val cutoff = LocalDate.now().minusDays(1).toEpochDay()
+            val existingDays = appDao.allDailyLogs().filter { it.dateEpochDay <= cutoff }
+            val legacySnapshot = StreakCalculator.calculate(
+                days = existingDays,
+                requiredDays = StreakRules.LEGACY_FREEZE_REQUIRED_DAYS
+            )
+            settingsStore.preserveFreezeStateForSevenDayRule(cutoff, legacySnapshot)
+            historyRebuilder.rebuild()
+        }
     }
 
     private val core = combine(
@@ -58,7 +72,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         CoreData(ingredients, recipes, items, meals, grocery)
     }
 
-    val state = combine(core, appDao.observeDailyLogs(), targetFlow) { data, daily, target ->
+    val state = combine(
+        core,
+        appDao.observeDailyLogs(),
+        targetFlow,
+        settingsStore.freezeRuleBaseline
+    ) { data, daily, target, freezeBaseline ->
         val ingredientMap = data.ingredients.associateBy { it.id }
         val summaries = data.recipes.map { recipe ->
             val recipeItems = data.items.filter { it.recipeId == recipe.id }.map { item ->
@@ -96,7 +115,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val todayRecord = daily.firstOrNull { it.dateEpochDay == today }
         val todayFrozen = todayRecord?.manualCheatDay == true && todayRecord.freezeUsed
         val effectiveScore = FreezeTodayPolicy.effectiveScore(actualScore, todayFrozen)
-        val streak = StreakCalculator.calculate(daily)
+        val streak = freezeBaseline?.let { StreakCalculator.calculateWithBaseline(daily, it) }
+            ?: StreakCalculator.calculate(daily)
         AppUiState(
             ingredients = data.ingredients.filterNot { it.archived },
             allIngredients = data.ingredients,
