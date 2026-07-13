@@ -10,7 +10,11 @@ data class StreakSnapshot(
 )
 
 object StreakCalculator {
-    fun calculate(days: List<DailyLogEntity>, maxFreezes: Int = 3, requiredDays: Int = 5): StreakSnapshot {
+    fun calculate(
+        days: List<DailyLogEntity>,
+        maxFreezes: Int = StreakRules.MAX_STORED_FREEZES,
+        requiredDays: Int = StreakRules.FREEZE_REQUIRED_DAYS
+    ): StreakSnapshot {
         var current = 0
         var best = 0
         var freezes = 0
