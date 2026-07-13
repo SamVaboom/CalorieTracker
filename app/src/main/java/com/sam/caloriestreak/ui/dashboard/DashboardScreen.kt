@@ -116,7 +116,7 @@ fun DashboardScreen(
                 )
                 DashboardStat(
                     icon = { Icon(Icons.Outlined.Timelapse, contentDescription = null) },
-                    value = "${state.freezeProgress} / 5",
+                    value = "${state.freezeProgress} / ${state.freezeRequiredDays}",
                     label = "Freeze progress"
                 )
             }
