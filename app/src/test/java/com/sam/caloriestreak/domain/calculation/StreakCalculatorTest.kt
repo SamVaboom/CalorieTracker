@@ -60,9 +60,25 @@ class StreakCalculatorTest {
 
     @Test
     fun existingNumericProgressIsPreservedUnderNewRequirement() {
-        val result = StreakCalculator.calculate((1L..4L).map { day(it, 90.0) })
-        assertEquals(0, result.freezes)
+        val baseline = FreezeRuleBaseline(cutoffEpochDay = 10L, freezes = 1, progress = 4)
+        val result = StreakCalculator.calculateWithBaseline(
+            days = (1L..10L).map { day(it, 90.0) },
+            baseline = baseline
+        )
+        assertEquals(1, result.freezes)
         assertEquals(4, result.progress)
+    }
+
+    @Test
+    fun qualifyingDaysAfterMigrationUseSevenDayRule() {
+        val baseline = FreezeRuleBaseline(cutoffEpochDay = 10L, freezes = 1, progress = 4)
+        val future = (11L..13L).map { day(it, 90.0) }
+        val result = StreakCalculator.calculateWithBaseline(
+            days = (1L..10L).map { day(it, 90.0) } + future,
+            baseline = baseline
+        )
+        assertEquals(2, result.freezes)
+        assertEquals(0, result.progress)
     }
 
     @Test
