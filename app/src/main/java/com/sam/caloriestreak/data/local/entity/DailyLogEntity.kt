@@ -13,6 +13,8 @@ data class DailyLogEntity(
     val freezeUsed: Boolean = false,
     val manualCheatDay: Boolean = false,
     val freezeQualifying: Boolean = false,
+    val targetCalories: Double = 1650.0,
+    val scoreCurveVersion: Int = 1,
     val createdAt: Long,
     val updatedAt: Long
 )
