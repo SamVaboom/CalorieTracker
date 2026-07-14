@@ -19,11 +19,23 @@ object DatabaseProvider {
         }
     }
 
+    private val migration2To3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE daily_logs ADD COLUMN targetCalories REAL NOT NULL DEFAULT 1650.0")
+            db.execSQL("ALTER TABLE daily_logs ADD COLUMN scoreCurveVersion INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("CREATE TABLE IF NOT EXISTS weight_entries (id TEXT NOT NULL PRIMARY KEY, kilograms REAL NOT NULL, timestamp INTEGER NOT NULL, note TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_weight_entries_timestamp ON weight_entries(timestamp)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS earned_achievements (id TEXT NOT NULL PRIMARY KEY, achievementId TEXT NOT NULL, earnedAt INTEGER NOT NULL, triggeringEpochDay INTEGER, progressAtUnlock REAL, seen INTEGER NOT NULL)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_earned_achievements_achievementId ON earned_achievements(achievementId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_earned_achievements_earnedAt ON earned_achievements(earnedAt)")
+        }
+    }
+
     @Volatile private var instance: CalorieStreakDatabase? = null
 
     fun get(context: Context): CalorieStreakDatabase = instance ?: synchronized(this) {
         instance ?: Room.databaseBuilder(context.applicationContext, CalorieStreakDatabase::class.java, "calorie_streak.db")
-            .addMigrations(migration1To2)
+            .addMigrations(migration1To2, migration2To3)
             .build()
             .also { instance = it }
     }
