@@ -14,8 +14,8 @@ class StreakCalculatorTest {
         assertEquals(2, result.progress)
     }
 
-    @Test fun fiveQualifyingDaysEarnFreeze() {
-        val result = StreakCalculator.calculate((1L..5L).map { day(it, 90.0) })
+    @Test fun sevenQualifyingDaysEarnFreeze() {
+        val result = StreakCalculator.calculate((1L..7L).map { day(it, 90.0) })
         assertEquals(1, result.freezes)
         assertEquals(0, result.progress)
     }
