@@ -24,9 +24,9 @@ import com.sam.caloriestreak.domain.editing.RecipeIngredientDraft
 import com.sam.caloriestreak.domain.editing.UnitConverter
 import java.time.LocalDate
 import java.util.UUID
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -43,14 +43,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val ingredientDao = database.ingredientDao()
     private val appDao = database.appDao()
     private val settingsStore = SettingsStore(application)
-    private val scoreCalculator = ScoreCalculator()
     private val historyRebuilder = HistoryRebuilder(appDao)
-    private val targetFlow = MutableStateFlow(1650.0)
 
     init {
         viewModelScope.launch {
-            // Preserve the inventory and numeric progress earned under the previous five-day rule.
-            // Only finalized dates after this cutoff use the new seven-day earning requirement.
             val cutoff = LocalDate.now().minusDays(1).toEpochDay()
             val existingDays = appDao.allDailyLogs().filter { it.dateEpochDay <= cutoff }
             val legacySnapshot = StreakCalculator.calculate(
@@ -58,7 +54,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 requiredDays = StreakRules.LEGACY_FREEZE_REQUIRED_DAYS
             )
             settingsStore.preserveFreezeStateForSevenDayRule(cutoff, legacySnapshot)
-            historyRebuilder.rebuild()
+            historyRebuilder.rebuild(settingsStore.dailyTarget.first())
         }
     }
 
@@ -75,9 +71,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val state = combine(
         core,
         appDao.observeDailyLogs(),
-        targetFlow,
+        settingsStore.dailyTarget,
         settingsStore.freezeRuleBaseline
     ) { data, daily, target, freezeBaseline ->
+        val scoreCalculator = ScoreCalculator.forTarget(target)
         val ingredientMap = data.ingredients.associateBy { it.id }
         val summaries = data.recipes.map { recipe ->
             val recipeItems = data.items.filter { it.recipeId == recipe.id }.map { item ->
@@ -87,9 +84,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             val total = recipeItems.sumOf { item ->
                 val ingredient = ingredientMap[item.ingredientId]
-                if (ingredient == null) {
-                    0.0
-                } else {
+                if (ingredient == null) 0.0 else {
                     val convertedAmount = UnitConverter.convert(
                         amount = item.amount,
                         fromUnit = item.unit,
@@ -138,6 +133,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppUiState())
 
+    fun setDailyTarget(target: Int): Result<Unit> {
+        if (target !in 800..5000) return Result.failure(IllegalArgumentException("Target must be between 800 and 5000 kcal"))
+        viewModelScope.launch {
+            settingsStore.setDailyTarget(target.toDouble())
+            syncTodayOverride(target.toDouble())
+        }
+        return Result.success(Unit)
+    }
+
     fun saveIngredient(existing: IngredientEntity?, draft: IngredientDraft) {
         if (!draft.isValid()) return
         viewModelScope.launch {
@@ -167,9 +171,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteIngredient(ingredient: IngredientEntity) = viewModelScope.launch {
         if (appDao.recipeUseCount(ingredient.id) > 0) {
             ingredientDao.upsert(ingredient.copy(archived = true, updatedAt = System.currentTimeMillis()))
-        } else {
-            ingredientDao.delete(ingredient)
-        }
+        } else ingredientDao.delete(ingredient)
     }
 
     fun saveRecipe(existing: RecipeSummary?, draft: RecipeDraft) {
@@ -199,11 +201,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 name = name,
                 servings = servings,
                 items = selected.filter { it.second > 0.0 }.map { (ingredient, amount) ->
-                    RecipeIngredientDraft(
-                        ingredientId = ingredient.id,
-                        amount = amount,
-                        unit = ingredient.referenceUnit
-                    )
+                    RecipeIngredientDraft(ingredient.id, amount, ingredient.referenceUnit)
                 }
             )
         )
@@ -242,14 +240,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     updatedAt = now
                 )
             )
-            syncTodayOverride()
+            syncTodayOverride(state.value.target)
         }
     }
 
     fun deleteMeal(meal: MealLogEntity) = viewModelScope.launch {
         appDao.deleteMeal(meal)
-        syncTodayOverride()
-        historyRebuilder.rebuild()
+        syncTodayOverride(state.value.target)
+        historyRebuilder.rebuild(state.value.target)
     }
 
     fun freezeToday() = viewModelScope.launch {
@@ -257,10 +255,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val existing = appDao.dailyLogForDay(day)
         val alreadyFrozen = existing?.manualCheatDay == true || existing?.freezeUsed == true
         if (!FreezeTodayPolicy.canUseFreeze(state.value.freezes, alreadyFrozen)) return@launch
-
         val now = System.currentTimeMillis()
         val total = appDao.totalForDay(day)
-        val actualScore = scoreCalculator.calculate(total)
+        val target = state.value.target
+        val actualScore = ScoreCalculator.forTarget(target).calculate(total)
         appDao.upsertDailyLog(
             DailyLogEntity(
                 dateEpochDay = day,
@@ -272,22 +270,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 manualCheatDay = true,
                 freezeQualifying = FreezeTodayPolicy.qualifiesForProgress(actualScore),
                 createdAt = existing?.createdAt ?: now,
-                updatedAt = now
+                updatedAt = now,
+                targetCalories = target,
+                scoreCurveVersion = 1
             )
         )
     }
 
-    private suspend fun syncTodayOverride() {
+    private suspend fun syncTodayOverride(target: Double) {
         val day = LocalDate.now().toEpochDay()
         val existing = appDao.dailyLogForDay(day) ?: return
         if (existing.finalized) return
         val total = appDao.totalForDay(day)
-        val score = scoreCalculator.calculate(total)
+        val score = ScoreCalculator.forTarget(target).calculate(total)
         appDao.upsertDailyLog(
             existing.copy(
                 totalCalories = total,
                 score = score,
                 freezeQualifying = FreezeTodayPolicy.qualifiesForProgress(score),
+                targetCalories = target,
+                scoreCurveVersion = 1,
                 updatedAt = System.currentTimeMillis()
             )
         )
