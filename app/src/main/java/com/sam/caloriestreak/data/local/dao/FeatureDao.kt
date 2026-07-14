@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.sam.caloriestreak.data.local.entity.ActivityEventEntity
 import com.sam.caloriestreak.data.local.entity.EarnedAchievementEntity
 import com.sam.caloriestreak.data.local.entity.WeightEntryEntity
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +34,18 @@ interface FeatureDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEarnedAchievement(entry: EarnedAchievementEntity): Long
 
+    @Query("DELETE FROM earned_achievements WHERE achievementId = :achievementId")
+    suspend fun deleteEarnedAchievement(achievementId: String)
+
     @Query("UPDATE earned_achievements SET seen = 1")
     suspend fun markAllAchievementsSeen()
+
+    @Query("SELECT * FROM activity_events ORDER BY timestamp")
+    fun observeActivityEvents(): Flow<List<ActivityEventEntity>>
+
+    @Query("SELECT * FROM activity_events ORDER BY timestamp")
+    suspend fun allActivityEvents(): List<ActivityEventEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertActivityEvent(event: ActivityEventEntity): Long
 }
