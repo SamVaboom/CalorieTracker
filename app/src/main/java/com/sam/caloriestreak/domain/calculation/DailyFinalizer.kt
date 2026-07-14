@@ -7,10 +7,11 @@ object DailyFinalizer {
         day: Long,
         totalCalories: Double,
         previousDays: List<DailyLogEntity>,
+        targetCalories: Double = ScoreCalculator.DEFAULT_TARGET,
         automaticFreeze: Boolean = true,
         now: Long = System.currentTimeMillis()
     ): DailyLogEntity {
-        val score = ScoreCalculator().calculate(totalCalories)
+        val score = ScoreCalculator.forTarget(targetCalories).calculate(totalCalories)
         val before = StreakCalculator.calculate(previousDays)
         val success = score >= StreakRules.STREAK_SCORE_THRESHOLD
         val qualifying = score >= StreakRules.FREEZE_QUALIFYING_SCORE
@@ -25,7 +26,9 @@ object DailyFinalizer {
             manualCheatDay = false,
             freezeQualifying = qualifying,
             createdAt = now,
-            updatedAt = now
+            updatedAt = now,
+            targetCalories = targetCalories,
+            scoreCurveVersion = 1
         )
     }
 }
