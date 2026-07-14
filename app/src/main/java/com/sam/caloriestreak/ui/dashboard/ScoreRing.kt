@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.sam.caloriestreak.domain.calculation.ScoreDisplay
 
 @Composable
 fun ScoreRing(
@@ -23,7 +24,7 @@ fun ScoreRing(
     calorieStatus: String,
     modifier: Modifier = Modifier
 ) {
-    val progress = (score / 100.0).toFloat().coerceIn(0f, 1f)
+    val progress = (score.coerceIn(0.0, 100.0) / 100.0).toFloat()
     val background = MaterialTheme.colorScheme.surfaceVariant
     val gradient = Brush.sweepGradient(
         listOf(
@@ -38,26 +39,14 @@ fun ScoreRing(
     Box(modifier.size(286.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 22.dp.toPx()
-            drawArc(
-                color = background,
-                startAngle = -90f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
-            )
+            drawArc(background, -90f, 360f, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
             if (progress > 0f) {
-                drawArc(
-                    brush = gradient,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
+                drawArc(gradient, -90f, 360f * progress, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "${score.toInt()}%",
+                text = "${ScoreDisplay.percent(score)}%",
                 style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.Bold
             )
