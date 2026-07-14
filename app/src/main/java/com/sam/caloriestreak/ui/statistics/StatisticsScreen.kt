@@ -2,6 +2,7 @@ package com.sam.caloriestreak.ui.statistics
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -99,7 +100,7 @@ fun StatisticsScreen(
 }
 
 @Composable
-private fun StatCard(title: String, content: @Composable Column.() -> Unit) {
+private fun StatCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Column(Modifier.padding(16.dp)) {
             Text(title)
