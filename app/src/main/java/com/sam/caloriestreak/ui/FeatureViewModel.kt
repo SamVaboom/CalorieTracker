@@ -7,6 +7,7 @@ import com.sam.caloriestreak.data.local.database.DatabaseProvider
 import com.sam.caloriestreak.data.local.entity.ActivityEventEntity
 import com.sam.caloriestreak.data.local.entity.ActivityEventType
 import com.sam.caloriestreak.data.local.entity.EarnedAchievementEntity
+import com.sam.caloriestreak.data.local.entity.GroceryItemEntity
 import com.sam.caloriestreak.data.local.entity.WeightEntryEntity
 import com.sam.caloriestreak.data.settings.SettingsStore
 import com.sam.caloriestreak.domain.achievement.AchievementEvaluator
@@ -60,14 +61,7 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val day = LocalDate.now().toEpochDay()
-            dao.insertActivityEvent(
-                ActivityEventEntity(
-                    id = "app_open_$day",
-                    type = ActivityEventType.APP_OPEN,
-                    epochDay = day,
-                    timestamp = System.currentTimeMillis()
-                )
-            )
+            dao.insertActivityEvent(ActivityEventEntity("app_open_$day", ActivityEventType.APP_OPEN, day, System.currentTimeMillis()))
         }
         viewModelScope.launch(Dispatchers.IO) {
             combine(
@@ -112,6 +106,20 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
     fun deleteWeight(entry: WeightEntryEntity) = viewModelScope.launch(Dispatchers.IO) { dao.deleteWeight(entry) }
     fun markAchievementsSeen() = viewModelScope.launch(Dispatchers.IO) { dao.markAllAchievementsSeen() }
 
+    fun recordGroceryGenerated() = recordEvent(ActivityEventType.GROCERY_GENERATED)
+
+    fun recordGroceryToggle(items: List<GroceryItemEntity>, toggled: GroceryItemEntity) {
+        val resulting = items.map { if (it.id == toggled.id) it.copy(checked = !it.checked) else it }
+        if (resulting.isNotEmpty() && resulting.all { it.checked }) recordEvent(ActivityEventType.GROCERY_COMPLETED)
+    }
+
+    fun recordLastFreezeUsed() = recordEvent(ActivityEventType.LAST_FREEZE_USED)
+
+    private fun recordEvent(type: String) = viewModelScope.launch(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        dao.insertActivityEvent(ActivityEventEntity(UUID.randomUUID().toString(), type, LocalDate.now().toEpochDay(), now))
+    }
+
     private suspend fun reconcileAchievementsInternal() {
         val meals = appDao.allMeals()
         val daily = appDao.allDailyLogs()
@@ -124,7 +132,6 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
         val earnedIds = dao.earnedAchievementIds().toMutableSet()
         val registryIds = AchievementRegistry.all.map { it.id }.toSet()
 
-        // Remove records left behind by definitions that no longer exist.
         earnedIds.filterNot { it in registryIds }.forEach {
             dao.deleteEarnedAchievement(it)
             earnedIds.remove(it)
@@ -140,7 +147,6 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
             addAll(AchievementEvaluator.eligibleActivityAchievements(events))
         }
 
-        // Weight and goal milestones describe the latest current state and are intentionally revocable.
         AchievementRegistry.revocableWeightIds.filter { it in earnedIds && it !in eligibleWeightIds }.forEach {
             dao.deleteEarnedAchievement(it)
             earnedIds.remove(it)
