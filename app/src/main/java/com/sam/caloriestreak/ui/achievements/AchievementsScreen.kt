@@ -94,7 +94,7 @@ fun AchievementsScreen(earned: List<EarnedAchievementEntity>, onSeen: () -> Unit
                         trailingContent = {
                             if (locked) Text("Locked") else Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = "Earned", tint = earnedGreen)
-                                Text(if (!record.seen) " New" else " Earned")
+                                Text(if (record?.seen == false) " New" else " Earned")
                             }
                         }
                     )
