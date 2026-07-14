@@ -11,9 +11,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,6 +50,7 @@ fun CalorieStreakNavHost(
     featureViewModel: FeatureViewModel = viewModel()
 ) {
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
     val appState by appViewModel.state.collectAsStateWithLifecycle()
     val featureState by featureViewModel.state.collectAsStateWithLifecycle()
     val scoreCalculator = ScoreCalculator.forTarget(featureState.target)
@@ -61,6 +66,12 @@ fun CalorieStreakNavHost(
         achievementTotal = featureState.totalAchievements,
         unseenAchievementCount = featureState.unseenCount
     )
+    LaunchedEffect(featureState.unseenCount) {
+        if (featureState.unseenCount > 0) {
+            val noun = if (featureState.unseenCount == 1) "achievement" else "achievements"
+            snackbarHostState.showSnackbar("${featureState.unseenCount} $noun unlocked from your tracking history.")
+        }
+    }
     val items = listOf(
         Destination("dashboard", "Dashboard"),
         Destination("log", "Log Food"),
@@ -71,34 +82,37 @@ fun CalorieStreakNavHost(
     val entry by navController.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
 
-    Scaffold(bottomBar = {
-        NavigationBar {
-            items.forEachIndexed { index, item ->
-                val selected = if (item.route == "more") currentRoute == "more" || currentRoute in moreChildren else entry?.destination?.hierarchy?.any { it.route == item.route } == true
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = {
-                        navController.navigate(item.route) {
-                            launchSingleTop = true
-                            restoreState = true
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        }
-                    },
-                    icon = {
-                        val icon = when (index) {
-                            0 -> Icons.Default.Dashboard
-                            1 -> Icons.Default.PostAdd
-                            2 -> Icons.Default.MenuBook
-                            3 -> Icons.Default.History
-                            else -> Icons.Default.Menu
-                        }
-                        Icon(icon, contentDescription = item.label)
-                    },
-                    label = { Text(item.label) }
-                )
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            NavigationBar {
+                items.forEachIndexed { index, item ->
+                    val selected = if (item.route == "more") currentRoute == "more" || currentRoute in moreChildren else entry?.destination?.hierarchy?.any { it.route == item.route } == true
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            navController.navigate(item.route) {
+                                launchSingleTop = true
+                                restoreState = true
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            }
+                        },
+                        icon = {
+                            val icon = when (index) {
+                                0 -> Icons.Default.Dashboard
+                                1 -> Icons.Default.PostAdd
+                                2 -> Icons.Default.MenuBook
+                                3 -> Icons.Default.History
+                                else -> Icons.Default.Menu
+                            }
+                            Icon(icon, contentDescription = item.label)
+                        },
+                        label = { Text(item.label) }
+                    )
+                }
             }
         }
-    }) { padding ->
+    ) { padding ->
         NavHost(navController, startDestination = "dashboard", modifier = Modifier.padding(padding)) {
             composable("dashboard") {
                 DashboardScreen(
