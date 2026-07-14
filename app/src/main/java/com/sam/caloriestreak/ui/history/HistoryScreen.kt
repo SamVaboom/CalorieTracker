@@ -137,10 +137,10 @@ private fun WeightHistoryList(weights: List<WeightEntryEntity>) {
 @Composable
 private fun WeightGraphMode(weights: List<WeightEntryEntity>, range: HistoryRange, onRangeChange: (HistoryRange) -> Unit) {
     val days = when (range) {
-        HistoryRange.LAST_WEEK -> 7L
-        HistoryRange.LAST_MONTH -> 30L
-        HistoryRange.LAST_YEAR -> 365L
-        HistoryRange.ALL_TIME -> null
+        HistoryRange.WEEK -> 7L
+        HistoryRange.MONTH -> 30L
+        HistoryRange.YEAR -> 365L
+        HistoryRange.ALL -> null
     }
     val cutoff = days?.let { System.currentTimeMillis() - it * 86_400_000L } ?: Long.MIN_VALUE
     val points = weights.filter { it.timestamp >= cutoff }.sortedBy { it.timestamp }
