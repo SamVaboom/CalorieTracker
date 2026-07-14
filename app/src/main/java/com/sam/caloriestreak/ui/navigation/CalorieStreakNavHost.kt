@@ -105,7 +105,10 @@ fun CalorieStreakNavHost(
                     state = state,
                     onHistory = { navController.navigate("history") },
                     onStatistics = { navController.navigate("statistics") },
-                    onFreezeToday = appViewModel::freezeToday,
+                    onFreezeToday = {
+                        if (state.freezes == 1) featureViewModel.recordLastFreezeUsed()
+                        appViewModel.freezeToday()
+                    },
                     onDeleteMeal = appViewModel::deleteMeal
                 )
             }
@@ -145,9 +148,15 @@ fun CalorieStreakNavHost(
                     recipes = state.recipes,
                     ingredients = state.ingredients,
                     items = state.groceryItems,
-                    onGenerate = appViewModel::generateGrocery,
+                    onGenerate = { recipe, multiplier ->
+                        appViewModel.generateGrocery(recipe, multiplier)
+                        featureViewModel.recordGroceryGenerated()
+                    },
                     onAddIngredient = appViewModel::addIngredientToGrocery,
-                    onToggle = appViewModel::toggleGrocery,
+                    onToggle = { item ->
+                        featureViewModel.recordGroceryToggle(state.groceryItems, item)
+                        appViewModel.toggleGrocery(item)
+                    },
                     onClear = appViewModel::clearGrocery
                 )
             }
