@@ -10,7 +10,7 @@ data class StreakSnapshot(
 )
 
 object StreakCalculator {
-    fun calculate(days: List<DailyLogEntity>, maxFreezes: Int = 3, requiredDays: Int = 5): StreakSnapshot {
+    fun calculate(days: List<DailyLogEntity>, maxFreezes: Int = 3, requiredDays: Int = 7): StreakSnapshot {
         var current = 0
         var best = 0
         var freezes = 0
@@ -20,7 +20,6 @@ object StreakCalculator {
             if (day.finalized) {
                 if (day.streakSuccessful || day.freezeUsed) current++ else current = 0
                 best = maxOf(best, current)
-
                 if (day.freezeQualifying) {
                     progress++
                     while (progress >= requiredDays && freezes < maxFreezes) {
@@ -29,9 +28,6 @@ object StreakCalculator {
                     }
                 }
             }
-
-            // An in-progress manual Freeze Today record consumes inventory immediately but does not
-            // add a streak day or freeze progress until the date is finalized.
             if (day.freezeUsed && freezes > 0) freezes--
         }
         return StreakSnapshot(current, best, freezes, progress)
