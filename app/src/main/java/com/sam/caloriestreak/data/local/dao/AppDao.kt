@@ -22,6 +22,9 @@ interface AppDao {
     @Query("SELECT * FROM recipes ORDER BY favorite DESC, archived ASC, name")
     fun observeAllRecipes(): Flow<List<RecipeEntity>>
 
+    @Query("SELECT * FROM recipes")
+    suspend fun allRecipes(): List<RecipeEntity>
+
     @Query("SELECT * FROM recipe_items ORDER BY ingredientName")
     fun observeRecipeItems(): Flow<List<RecipeItemEntity>>
 
