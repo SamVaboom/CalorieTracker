@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -64,15 +65,15 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
             dao.insertActivityEvent(ActivityEventEntity("app_open_$day", ActivityEventType.APP_OPEN, day, System.currentTimeMillis()))
         }
         viewModelScope.launch(Dispatchers.IO) {
-            combine(
+            val dataChanges = combine(
                 appDao.observeMeals(),
                 appDao.observeDailyLogs(),
                 appDao.observeAllRecipes(),
                 ingredientDao.observeAll(),
-                dao.observeWeights(),
-                dao.observeActivityEvents(),
-                settings.weightGoal
-            ) { _, _, _, _, _, _, _ -> Unit }.collectLatest { reconcileAchievementsInternal() }
+                dao.observeWeights()
+            ) { _, _, _, _, _ -> Unit }
+            combine(dataChanges, dao.observeActivityEvents(), settings.weightGoal) { _, _, _ -> Unit }
+                .collectLatest { reconcileAchievementsInternal() }
         }
     }
 
@@ -127,12 +128,12 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
         val events = dao.allActivityEvents()
         val recipes = appDao.allRecipes()
         val ingredients = ingredientDao.all()
-        val weightGoal = state.value.weightGoal
+        val weightGoal = settings.weightGoal.first()
         val currentFreezes = StreakCalculator.calculate(daily).freezes
         val earnedIds = dao.earnedAchievementIds().toMutableSet()
         val registryIds = AchievementRegistry.all.map { it.id }.toSet()
 
-        earnedIds.filterNot { it in registryIds }.forEach {
+        earnedIds.filterNot { it in registryIds }.toList().forEach {
             dao.deleteEarnedAchievement(it)
             earnedIds.remove(it)
         }
