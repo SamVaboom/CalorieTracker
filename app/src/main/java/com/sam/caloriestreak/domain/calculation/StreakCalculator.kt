@@ -14,32 +14,28 @@ object StreakCalculator {
         days: List<DailyLogEntity>,
         maxFreezes: Int = StreakRules.MAX_STORED_FREEZES,
         requiredDays: Int = StreakRules.FREEZE_REQUIRED_DAYS
-    ): StreakSnapshot {
-        return calculateInternal(
-            days = days,
-            initialFreezes = 0,
-            initialProgress = 0,
-            freezeCutoffExclusive = Long.MIN_VALUE,
-            maxFreezes = maxFreezes,
-            requiredDays = requiredDays
-        )
-    }
+    ): StreakSnapshot = calculateInternal(
+        days = days,
+        initialFreezes = 0,
+        initialProgress = 0,
+        freezeCutoffExclusive = Long.MIN_VALUE,
+        maxFreezes = maxFreezes,
+        requiredDays = requiredDays
+    )
 
     fun calculateWithBaseline(
         days: List<DailyLogEntity>,
         baseline: FreezeRuleBaseline,
         maxFreezes: Int = StreakRules.MAX_STORED_FREEZES,
         requiredDays: Int = StreakRules.FREEZE_REQUIRED_DAYS
-    ): StreakSnapshot {
-        return calculateInternal(
-            days = days,
-            initialFreezes = baseline.freezes.coerceIn(0, maxFreezes),
-            initialProgress = baseline.progress.coerceAtLeast(0),
-            freezeCutoffExclusive = baseline.cutoffEpochDay,
-            maxFreezes = maxFreezes,
-            requiredDays = requiredDays
-        )
-    }
+    ): StreakSnapshot = calculateInternal(
+        days = days,
+        initialFreezes = baseline.freezes.coerceIn(0, maxFreezes),
+        initialProgress = if (baseline.freezes >= maxFreezes) 0 else baseline.progress.coerceIn(0, requiredDays - 1),
+        freezeCutoffExclusive = baseline.cutoffEpochDay,
+        maxFreezes = maxFreezes,
+        requiredDays = requiredDays
+    )
 
     private fun calculateInternal(
         days: List<DailyLogEntity>,
@@ -51,8 +47,8 @@ object StreakCalculator {
     ): StreakSnapshot {
         var current = 0
         var best = 0
-        var freezes = initialFreezes
-        var progress = initialProgress
+        var freezes = initialFreezes.coerceIn(0, maxFreezes)
+        var progress = if (freezes >= maxFreezes) 0 else initialProgress.coerceIn(0, requiredDays - 1)
 
         days.sortedBy { it.dateEpochDay }.forEach { day ->
             if (day.finalized) {
@@ -60,19 +56,23 @@ object StreakCalculator {
                 best = maxOf(best, current)
 
                 if (day.dateEpochDay > freezeCutoffExclusive && day.freezeQualifying) {
-                    progress++
-                    while (progress >= requiredDays && freezes < maxFreezes) {
-                        freezes++
-                        progress -= requiredDays
+                    if (freezes < maxFreezes) {
+                        progress++
+                        if (progress >= requiredDays) {
+                            freezes++
+                            progress = 0
+                        }
+                    } else {
+                        // Do not bank invisible qualifying days while freeze storage is full.
+                        progress = 0
                     }
                 }
             }
 
-            // Freeze usage before the migration cutoff is already included in the saved baseline.
             if (day.dateEpochDay > freezeCutoffExclusive && day.freezeUsed && freezes > 0) {
                 freezes--
             }
         }
-        return StreakSnapshot(current, best, freezes, progress)
+        return StreakSnapshot(current, best, freezes.coerceAtMost(maxFreezes), progress)
     }
 }
