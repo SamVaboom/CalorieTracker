@@ -4,17 +4,15 @@ import com.sam.caloriestreak.data.local.dao.AppDao
 import java.time.LocalDate
 
 class HistoryRebuilder(private val dao: AppDao) {
-    suspend fun rebuild() {
+    suspend fun rebuild(configuredTarget: Double = ScoreCalculator.DEFAULT_TARGET) {
         val meals = dao.allMeals()
         val existing = dao.allDailyLogs()
         val rebuilt = DailyHistoryCalculator.rebuildCompletedDays(
             meals = meals,
             existing = existing,
-            todayEpochDay = LocalDate.now().toEpochDay()
+            todayEpochDay = LocalDate.now().toEpochDay(),
+            configuredTarget = configuredTarget
         )
-
-        // Replace only finalized summaries. An in-progress record for today, such as a manually
-        // frozen day, must not be removed while historical totals are rebuilt.
         dao.deleteFinalizedDailyLogs()
         rebuilt.forEach { dao.upsertDailyLog(it) }
     }
