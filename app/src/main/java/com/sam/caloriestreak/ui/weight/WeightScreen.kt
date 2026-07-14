@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.WeightEntryEntity
@@ -46,6 +48,7 @@ private enum class WeightRange(val days: Long?) { WEEK(7), MONTH(30), YEAR(365),
 fun WeightScreen(
     entries: List<WeightEntryEntity>,
     stats: WeightStats,
+    weightGoal: Double?,
     onAdd: (Double, Long, String?) -> Result<Unit>,
     onUpdate: (WeightEntryEntity, Double, Long, String?) -> Result<Unit>,
     onDelete: (WeightEntryEntity) -> Unit
@@ -70,6 +73,7 @@ fun WeightScreen(
             Text("Since first: ${stats.changeFromFirst?.let { "%+.1f kg".format(it) } ?: "—"}")
             Text("Lowest / highest: ${stats.lowest?.let { "%.1f".format(it) } ?: "—"} / ${stats.highest?.let { "%.1f kg".format(it) } ?: "—"}")
             Text("Average: ${stats.averageAll?.let { "%.1f kg".format(it) } ?: "—"}")
+            weightGoal?.let { Text("Goal: %.1f kg".format(it)) }
             Button(onClick = { adding = true }) { Text("Add weight") }
         }
         item {
@@ -86,13 +90,17 @@ fun WeightScreen(
                     }
                 }
             }
-            item { WeightGraph(entries = filter(entries, range)) }
+            item { WeightGraph(entries = filter(entries, range), weightGoal = weightGoal) }
         } else {
             items(entries.sortedByDescending { it.timestamp }, key = { it.id }) { entry ->
                 val change = changeById[entry.id]
+                val headline = buildString {
+                    append("%.1f kg".format(entry.kilograms))
+                    change?.let { append(" · ${"%+.1f kg".format(it)}") }
+                }
                 Card {
                     ListItem(
-                        headlineContent = { Text("%.1f kg${change?.let { " · %+.1f".format(it) } ?: ""}") },
+                        headlineContent = { Text(headline) },
                         supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(entry.timestamp)) + (entry.note?.let { "\n$it" } ?: "")) },
                         trailingContent = {
                             Row {
@@ -124,16 +132,18 @@ private fun filter(entries: List<WeightEntryEntity>, range: WeightRange): List<W
 }
 
 @Composable
-private fun WeightGraph(entries: List<WeightEntryEntity>) {
+private fun WeightGraph(entries: List<WeightEntryEntity>, weightGoal: Double?) {
     if (entries.size < 2) {
         Text("Add at least two weight entries to show a graph.")
         return
     }
     var selected by remember(entries) { mutableStateOf<WeightEntryEntity?>(null) }
-    val min = entries.minOf { it.kilograms }
-    val max = entries.maxOf { it.kilograms }
+    val values = entries.map { it.kilograms } + listOfNotNull(weightGoal)
+    val min = values.minOrNull() ?: 0.0
+    val max = values.maxOrNull() ?: 1.0
     val span = (max - min).takeIf { it > 0 } ?: 1.0
-    val lineColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+    val lineColor = MaterialTheme.colorScheme.primary
+    val goalColor = MaterialTheme.colorScheme.tertiary
     Canvas(
         Modifier.fillMaxWidth().height(220.dp).padding(12.dp).pointerInput(entries) {
             detectTapGestures { tap ->
@@ -151,9 +161,14 @@ private fun WeightGraph(entries: List<WeightEntryEntity>) {
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
             drawCircle(lineColor, radius = if (selected?.id == entry.id) 9f else 5f, center = Offset(x, y))
         }
-        drawPath(path, lineColor, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
+        drawPath(path, lineColor, style = Stroke(width = 4f))
+        weightGoal?.let { goal ->
+            val y = size.height - ((goal - min) / span * size.height).toFloat()
+            drawLine(goalColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 3f)
+        }
     }
     selected?.let { Text("${DateFormat.getDateTimeInstance().format(Date(it.timestamp))}: %.1f kg".format(it.kilograms)) }
+    weightGoal?.let { Text("Goal line: %.1f kg".format(it), color = MaterialTheme.colorScheme.tertiary) }
 }
 
 @Composable
