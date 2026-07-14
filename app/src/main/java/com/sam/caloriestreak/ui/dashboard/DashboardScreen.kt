@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
+import com.sam.caloriestreak.domain.calculation.ScoreDisplay
 import com.sam.caloriestreak.ui.AppUiState
 import com.sam.caloriestreak.ui.components.MealLogRow
 import java.time.LocalDate
@@ -68,31 +69,19 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Outlined.AcUnit,
-                    contentDescription = "Available streak freezes",
-                    tint = MaterialTheme.colorScheme.tertiary
-                )
-                Text(
-                    text = state.freezes.toString(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 6.dp)
-                )
+                Icon(Icons.Outlined.AcUnit, contentDescription = "Available streak freezes", tint = MaterialTheme.colorScheme.tertiary)
+                Text(state.freezes.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
             }
         }
         item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ScoreRing(
-                    score = state.todayEffectiveScore,
-                    calorieStatus = calorieStatus
-                )
+                ScoreRing(score = state.todayEffectiveScore, calorieStatus = calorieStatus)
             }
         }
         if (state.todayFrozen) {
             item {
                 Text(
-                    text = "Actual calorie score: ${state.todayScore.toInt()}% · ${state.todayCalories.toInt()} kcal",
+                    text = "Actual calorie score: ${ScoreDisplay.percent(state.todayScore)}% · ${state.todayCalories.toInt()} kcal",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -100,45 +89,20 @@ fun DashboardScreen(
             }
         }
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                DashboardStat(
-                    icon = { Icon(Icons.Outlined.LocalFireDepartment, contentDescription = null) },
-                    value = "${state.currentStreak}",
-                    label = "Current streak"
-                )
-                DashboardStat(
-                    icon = { Icon(Icons.Outlined.EmojiEvents, contentDescription = null) },
-                    value = "${state.bestStreak}",
-                    label = "Best streak"
-                )
-                DashboardStat(
-                    icon = { Icon(Icons.Outlined.Timelapse, contentDescription = null) },
-                    value = "${state.freezeProgress} / ${state.freezeRequiredDays}",
-                    label = "Freeze progress"
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                DashboardStat({ Icon(Icons.Outlined.LocalFireDepartment, contentDescription = null) }, "${state.currentStreak}", "Current streak")
+                DashboardStat({ Icon(Icons.Outlined.EmojiEvents, contentDescription = null) }, "${state.bestStreak}", "Best streak")
+                DashboardStat({ Icon(Icons.Outlined.Timelapse, contentDescription = null) }, "${state.freezeProgress} / ${state.freezeRequiredDays}", "Freeze progress")
             }
         }
         item {
-            Button(
-                onClick = { confirmFreeze = true },
-                enabled = state.freezes > 0 && !state.todayFrozen,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = { confirmFreeze = true }, enabled = state.freezes > 0 && !state.todayFrozen, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.AcUnit, contentDescription = null)
-                Text(
-                    text = if (state.todayFrozen) "Freeze active today" else "Freeze Today",
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+                Text(if (state.todayFrozen) "Freeze active today" else "Freeze Today", modifier = Modifier.padding(start = 8.dp))
             }
         }
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onHistory, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Outlined.History, contentDescription = null)
                     Text("History", Modifier.padding(start = 6.dp))
@@ -149,27 +113,11 @@ fun DashboardScreen(
                 }
             }
         }
-        item {
-            Text(
-                text = "Today's meals",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        item { Text("Today's meals", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold) }
         if (todayMeals.isEmpty()) {
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Text(
-                        "No food logged yet.",
-                        modifier = Modifier.padding(18.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            item { Card(Modifier.fillMaxWidth()) { Text("No food logged yet.", modifier = Modifier.padding(18.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         } else {
-            items(todayMeals, key = { it.id }) { meal ->
-                MealLogRow(meal = meal, onDelete = onDeleteMeal)
-            }
+            items(todayMeals, key = { it.id }) { meal -> MealLogRow(meal = meal, onDelete = onDeleteMeal) }
         }
     }
 
@@ -177,41 +125,18 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { confirmFreeze = false },
             title = { Text("Freeze today?") },
-            text = {
-                Text(
-                    "One streak freeze will be consumed. Today's real calories and actual score remain visible, but the effective streak score becomes 100%."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmFreeze = false
-                    onFreezeToday()
-                }) { Text("Use one freeze") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmFreeze = false }) { Text("Cancel") }
-            }
+            text = { Text("One streak freeze will be consumed. Today's real calories and actual score remain visible, but the effective streak score becomes 100%.") },
+            confirmButton = { TextButton(onClick = { confirmFreeze = false; onFreezeToday() }) { Text("Use one freeze") } },
+            dismissButton = { TextButton(onClick = { confirmFreeze = false }) { Text("Cancel") } }
         )
     }
 }
 
 @Composable
-private fun DashboardStat(
-    icon: @Composable () -> Unit,
-    value: String,
-    label: String
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(horizontal = 4.dp)
-    ) {
+private fun DashboardStat(icon: @Composable () -> Unit, value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 4.dp)) {
         icon()
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
