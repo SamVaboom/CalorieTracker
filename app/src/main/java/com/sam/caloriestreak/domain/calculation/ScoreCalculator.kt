@@ -29,16 +29,25 @@ class ScoreCalculator(points: List<ScorePoint> = defaultPoints) {
     }
 
     companion object {
+        const val DEFAULT_TARGET = 1650.0
         private const val TARGET_EPSILON = 0.000001
 
-        val defaultPoints = listOf(
-            ScorePoint(800.0, 0.0),
-            ScorePoint(1200.0, 40.0),
-            ScorePoint(1400.0, 80.0),
-            ScorePoint(1650.0, 100.0),
-            ScorePoint(1800.0, 75.0),
-            ScorePoint(2000.0, 20.0),
-            ScorePoint(2200.0, 0.0)
-        )
+        val defaultPoints = pointsForTarget(DEFAULT_TARGET)
+
+        fun pointsForTarget(target: Double): List<ScorePoint> {
+            require(target in 800.0..5000.0) { "Target must be between 800 and 5000 kcal" }
+            val scale = target / DEFAULT_TARGET
+            return listOf(
+                ScorePoint(800.0 * scale, 0.0),
+                ScorePoint(1200.0 * scale, 40.0),
+                ScorePoint(1400.0 * scale, 80.0),
+                ScorePoint(target, 100.0),
+                ScorePoint(1800.0 * scale, 75.0),
+                ScorePoint(2000.0 * scale, 20.0),
+                ScorePoint(2200.0 * scale, 0.0)
+            )
+        }
+
+        fun forTarget(target: Double) = ScoreCalculator(pointsForTarget(target))
     }
 }
