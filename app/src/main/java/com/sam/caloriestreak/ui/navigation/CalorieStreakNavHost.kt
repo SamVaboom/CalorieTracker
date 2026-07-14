@@ -49,11 +49,12 @@ fun CalorieStreakNavHost(
     val appState by appViewModel.state.collectAsStateWithLifecycle()
     val featureState by featureViewModel.state.collectAsStateWithLifecycle()
     val scoreCalculator = ScoreCalculator.forTarget(featureState.target)
+    val correctedScore = scoreCalculator.calculate(appState.todayCalories)
     val state = appState.copy(
         target = featureState.target,
-        todayScore = scoreCalculator.calculate(appState.todayCalories),
-        todayEffectiveScore = if (appState.todayFrozen) 100.0 else scoreCalculator.calculate(appState.todayCalories),
-        status = if (appState.todayFrozen) "Freeze active" else scoreCalculator.status(scoreCalculator.calculate(appState.todayCalories)),
+        todayScore = correctedScore,
+        todayEffectiveScore = if (appState.todayFrozen) 100.0 else correctedScore,
+        status = if (appState.todayFrozen) "Freeze active" else scoreCalculator.status(correctedScore),
         weights = featureState.weights,
         weightStats = featureState.weightStats,
         earnedAchievements = featureState.earned,
@@ -118,7 +119,13 @@ fun CalorieStreakNavHost(
                 )
             }
             composable("history") {
-                HistoryScreen(meals = state.meals, dailyLogs = state.dailyLogs, targetCalories = state.target, onDelete = appViewModel::deleteMeal)
+                HistoryScreen(
+                    meals = state.meals,
+                    dailyLogs = state.dailyLogs,
+                    weights = featureState.weights,
+                    targetCalories = state.target,
+                    onDelete = appViewModel::deleteMeal
+                )
             }
             composable("more") {
                 MoreScreen(
@@ -139,13 +146,32 @@ fun CalorieStreakNavHost(
                 WeightScreen(featureState.weights, featureState.weightStats, featureViewModel::addWeight, featureViewModel::updateWeight, featureViewModel::deleteWeight)
             }
             composable("achievements") { AchievementsScreen(featureState.earned, featureViewModel::markAchievementsSeen) }
-            composable("settings") { SettingsScreen(featureState.target, featureViewModel::setTarget) }
+            composable("settings") {
+                SettingsScreen(featureState.target) { target ->
+                    featureViewModel.setTarget(target).fold(
+                        onSuccess = { appViewModel.setTarget(target) },
+                        onFailure = { Result.failure(it) }
+                    )
+                }
+            }
             composable("ingredients") {
                 IngredientsScreen(state.ingredients, appViewModel::addIngredient, appViewModel::deleteIngredient) {
                     navController.navigate("recipes") { launchSingleTop = true; popUpTo("recipes") { inclusive = false } }
                 }
             }
-            composable("statistics") { StatisticsScreen(state.meals, state.currentStreak, state.bestStreak) }
+            composable("statistics") {
+                StatisticsScreen(
+                    meals = state.meals,
+                    currentStreak = state.currentStreak,
+                    bestStreak = state.bestStreak,
+                    targetCalories = state.target,
+                    freezes = state.freezes,
+                    freezeProgress = state.freezeProgress,
+                    weight = featureState.weightStats,
+                    earnedAchievements = featureState.earned.size,
+                    totalAchievements = featureState.totalAchievements
+                )
+            }
         }
     }
 }
