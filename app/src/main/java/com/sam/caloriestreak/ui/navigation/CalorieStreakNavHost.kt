@@ -3,7 +3,6 @@ package com.sam.caloriestreak.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PostAdd
@@ -56,7 +55,6 @@ fun CalorieStreakNavHost(
         Destination("dashboard", "Dashboard"),
         Destination("log", "Log Food"),
         Destination("recipes", "Recipes"),
-        Destination("history", "History"),
         Destination("more", "More")
     )
     val entry by navController.currentBackStackEntryAsState()
@@ -91,7 +89,6 @@ fun CalorieStreakNavHost(
                                 0 -> Icons.Default.Dashboard
                                 1 -> Icons.Default.PostAdd
                                 2 -> Icons.Default.MenuBook
-                                3 -> Icons.Default.History
                                 else -> Icons.Default.Menu
                             }
                             Icon(icon, contentDescription = item.label)
@@ -127,6 +124,7 @@ fun CalorieStreakNavHost(
                     dailyLogs = state.dailyLogs,
                     weights = featureState.weights,
                     targetCalories = state.target,
+                    weightGoal = featureState.weightGoal,
                     onDelete = appViewModel::deleteMeal
                 )
             }
@@ -154,16 +152,28 @@ fun CalorieStreakNavHost(
                 )
             }
             composable("weight") {
-                WeightScreen(featureState.weights, featureState.weightStats, featureViewModel::addWeight, featureViewModel::updateWeight, featureViewModel::deleteWeight)
+                WeightScreen(
+                    entries = featureState.weights,
+                    stats = featureState.weightStats,
+                    weightGoal = featureState.weightGoal,
+                    onAdd = featureViewModel::addWeight,
+                    onUpdate = featureViewModel::updateWeight,
+                    onDelete = featureViewModel::deleteWeight
+                )
             }
             composable("achievements") { AchievementsScreen(featureState.earned, featureViewModel::markAchievementsSeen) }
             composable("settings") {
-                SettingsScreen(state.target, state.freezeRequiredDays) { target ->
-                    featureViewModel.setTarget(target).fold(
-                        onSuccess = { appViewModel.setDailyTarget(target) },
-                        onFailure = { Result.failure(it) }
-                    )
-                }
+                SettingsScreen(
+                    calorieTarget = state.target,
+                    weightGoal = featureState.weightGoal,
+                    freezeRequiredDays = state.freezeRequiredDays,
+                    onSave = { calorieTarget, weightGoal ->
+                        featureViewModel.setGoals(calorieTarget, weightGoal).fold(
+                            onSuccess = { appViewModel.setDailyTarget(calorieTarget) },
+                            onFailure = { Result.failure(it) }
+                        )
+                    }
+                )
             }
             composable("ingredients") {
                 IngredientsScreen(
