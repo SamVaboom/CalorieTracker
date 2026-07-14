@@ -12,8 +12,8 @@ object DailyFinalizer {
     ): DailyLogEntity {
         val score = ScoreCalculator().calculate(totalCalories)
         val before = StreakCalculator.calculate(previousDays)
-        val success = score >= 80.0
-        val qualifying = score >= 85.0
+        val success = score >= StreakRules.STREAK_SCORE_THRESHOLD
+        val qualifying = score >= StreakRules.FREEZE_QUALIFYING_SCORE
         val useFreeze = !success && automaticFreeze && before.freezes > 0
         return DailyLogEntity(
             dateEpochDay = day,

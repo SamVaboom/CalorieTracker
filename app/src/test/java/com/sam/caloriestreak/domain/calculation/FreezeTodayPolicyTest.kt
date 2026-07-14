@@ -29,10 +29,10 @@ class FreezeTodayPolicyTest {
 
     @Test
     fun inProgressFreezeConsumesInventoryWithoutAddingStreakDay() {
-        val earnedDays = (1L..5L).map { day -> qualifyingDay(day) }
+        val earnedDays = (1L..7L).map { day -> qualifyingDay(day) }
         val before = StreakCalculator.calculate(earnedDays)
         val frozenToday = DailyLogEntity(
-            dateEpochDay = 6,
+            dateEpochDay = 8,
             totalCalories = 2300.0,
             score = 0.0,
             finalized = false,
@@ -40,8 +40,8 @@ class FreezeTodayPolicyTest {
             freezeUsed = true,
             manualCheatDay = true,
             freezeQualifying = false,
-            createdAt = 6,
-            updatedAt = 6
+            createdAt = 8,
+            updatedAt = 8
         )
         val after = StreakCalculator.calculate(earnedDays + frozenToday)
 

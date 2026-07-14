@@ -7,5 +7,6 @@ object FreezeTodayPolicy {
     fun effectiveScore(actualScore: Double, frozen: Boolean): Double =
         if (frozen) 100.0 else actualScore.coerceIn(0.0, 100.0)
 
-    fun qualifiesForProgress(actualScore: Double): Boolean = actualScore >= 85.0
+    fun qualifiesForProgress(actualScore: Double): Boolean =
+        actualScore >= StreakRules.FREEZE_QUALIFYING_SCORE
 }

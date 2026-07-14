@@ -49,7 +49,7 @@ object DailyHistoryCalculator {
                 freezeUsed = if (manualCheatDay) true else calculated.freezeUsed,
                 manualCheatDay = manualCheatDay,
                 // Qualification always follows the actual calorie-based score, even on a frozen day.
-                freezeQualifying = calculated.score >= 85.0,
+                freezeQualifying = calculated.score >= StreakRules.FREEZE_QUALIFYING_SCORE,
                 createdAt = previous?.createdAt ?: calculated.createdAt,
                 updatedAt = now
             )

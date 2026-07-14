@@ -84,9 +84,9 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
             }
             composable("recipes") {
                 RecipesScreen(
-                    ingredients = state.ingredients,
-                    recipes = state.recipes,
-                    onAdd = appViewModel::addRecipe,
+                    ingredients = state.allIngredients,
+                    recipes = state.allRecipes,
+                    onSave = appViewModel::saveRecipe,
                     onOpenIngredients = { navController.navigate("ingredients") { launchSingleTop = true } }
                 )
             }
@@ -103,8 +103,8 @@ fun CalorieStreakNavHost(appViewModel: AppViewModel = viewModel()) {
             }
             composable("ingredients") {
                 IngredientsScreen(
-                    ingredients = state.ingredients,
-                    onAdd = appViewModel::addIngredient,
+                    ingredients = state.allIngredients,
+                    onSave = appViewModel::saveIngredient,
                     onDelete = appViewModel::deleteIngredient,
                     onOpenRecipes = {
                         navController.navigate("recipes") {
