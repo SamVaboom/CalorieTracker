@@ -1,9 +1,10 @@
 package com.sam.caloriestreak.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "daily_logs")
+@Entity(tableName = "daily_logs", indices = [Index("dateEpochDay")])
 data class DailyLogEntity(
     @PrimaryKey val dateEpochDay: Long,
     val totalCalories: Double,
@@ -14,5 +15,7 @@ data class DailyLogEntity(
     val manualCheatDay: Boolean = false,
     val freezeQualifying: Boolean = false,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val targetCalories: Double = 1650.0,
+    val scoreCurveVersion: Int = 1
 )
