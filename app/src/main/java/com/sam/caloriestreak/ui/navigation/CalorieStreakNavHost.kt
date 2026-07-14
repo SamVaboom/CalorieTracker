@@ -40,6 +40,7 @@ import com.sam.caloriestreak.ui.statistics.StatisticsScreen
 import com.sam.caloriestreak.ui.weight.WeightScreen
 
 private data class Destination(val route: String, val label: String)
+private val dashboardChildren = setOf("history", "statistics")
 private val moreChildren = setOf("grocery", "weight", "achievements", "settings")
 
 @Composable
@@ -72,9 +73,11 @@ fun CalorieStreakNavHost(
         bottomBar = {
             NavigationBar {
                 items.forEachIndexed { index, item ->
-                    val selected = if (item.route == "more") {
-                        currentRoute == "more" || currentRoute in moreChildren
-                    } else entry?.destination?.hierarchy?.any { it.route == item.route } == true
+                    val selected = when (item.route) {
+                        "dashboard" -> currentRoute == "dashboard" || currentRoute in dashboardChildren
+                        "more" -> currentRoute == "more" || currentRoute in moreChildren
+                        else -> entry?.destination?.hierarchy?.any { it.route == item.route } == true
+                    }
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
