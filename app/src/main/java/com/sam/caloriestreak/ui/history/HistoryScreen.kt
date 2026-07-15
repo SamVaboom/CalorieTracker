@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ fun HistoryScreen(
     dailyLogs: List<DailyLogEntity>,
     weights: List<WeightEntryEntity>,
     targetCalories: Double,
+    weightGoal: Double?,
     onDelete: (MealLogEntity) -> Unit
 ) {
     var category by rememberSaveable { mutableStateOf(HistoryCategory.CALORIES) }
@@ -72,7 +74,7 @@ fun HistoryScreen(
         } else {
             when (mode) {
                 HistoryMode.LIST -> WeightHistoryList(weights)
-                HistoryMode.GRAPH -> WeightGraphMode(weights, range, { range = it })
+                HistoryMode.GRAPH -> WeightGraphMode(weights, weightGoal, range, { range = it })
             }
         }
     }
@@ -132,13 +134,17 @@ private fun WeightHistoryList(weights: List<WeightEntryEntity>) {
         if (sorted.isEmpty()) item { Text("No weight history yet.") }
         items(sorted, key = { it.id }) { entry ->
             val change = changeById[entry.id]
-            Card { ListItem(headlineContent = { Text("%.1f kg${change?.let { " · %+.1f".format(it) } ?: ""}") }, supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(entry.timestamp)) + (entry.note?.let { "\n$it" } ?: "")) }) }
+            val headline = buildString {
+                append("%.1f kg".format(entry.kilograms))
+                change?.let { append(" · ${"%+.1f kg".format(it)}") }
+            }
+            Card { ListItem(headlineContent = { Text(headline) }, supportingContent = { Text(DateFormat.getDateTimeInstance().format(Date(entry.timestamp)) + (entry.note?.let { "\n$it" } ?: "")) }) }
         }
     }
 }
 
 @Composable
-private fun WeightGraphMode(weights: List<WeightEntryEntity>, range: HistoryRange, onRangeChange: (HistoryRange) -> Unit) {
+private fun WeightGraphMode(weights: List<WeightEntryEntity>, weightGoal: Double?, range: HistoryRange, onRangeChange: (HistoryRange) -> Unit) {
     val days = when (range) {
         HistoryRange.WEEK -> 7L
         HistoryRange.MONTH -> 30L
@@ -151,10 +157,12 @@ private fun WeightGraphMode(weights: List<WeightEntryEntity>, range: HistoryRang
         item { RangeChips(range, onRangeChange) }
         item {
             if (points.size < 2) Text("Add at least two weight entries in this range.") else {
-                val min = points.minOf { it.kilograms }
-                val max = points.maxOf { it.kilograms }
+                val values = points.map { it.kilograms } + listOfNotNull(weightGoal)
+                val min = values.minOrNull() ?: 0.0
+                val max = values.maxOrNull() ?: 1.0
                 val span = (max - min).takeIf { it > 0 } ?: 1.0
-                val color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                val color = MaterialTheme.colorScheme.primary
+                val goalColor = MaterialTheme.colorScheme.tertiary
                 Canvas(Modifier.fillMaxWidth().height(240.dp).padding(12.dp)) {
                     val path = Path()
                     points.forEachIndexed { index, entry ->
@@ -164,8 +172,13 @@ private fun WeightGraphMode(weights: List<WeightEntryEntity>, range: HistoryRang
                         drawCircle(color, 5f, Offset(x, y))
                     }
                     drawPath(path, color, style = Stroke(4f))
+                    weightGoal?.let { goal ->
+                        val y = size.height - ((goal - min) / span * size.height).toFloat()
+                        drawLine(goalColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 3f)
+                    }
                 }
                 Text("Weight in kilograms; only recorded entries are plotted.")
+                weightGoal?.let { Text("Goal line: %.1f kg".format(it), color = goalColor) }
             }
         }
     }

@@ -3,7 +3,6 @@ package com.sam.caloriestreak.ui.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PostAdd
@@ -41,6 +40,7 @@ import com.sam.caloriestreak.ui.statistics.StatisticsScreen
 import com.sam.caloriestreak.ui.weight.WeightScreen
 
 private data class Destination(val route: String, val label: String)
+private val dashboardChildren = setOf("history", "statistics")
 private val moreChildren = setOf("grocery", "weight", "achievements", "settings")
 
 @Composable
@@ -56,7 +56,6 @@ fun CalorieStreakNavHost(
         Destination("dashboard", "Dashboard"),
         Destination("log", "Log Food"),
         Destination("recipes", "Recipes"),
-        Destination("history", "History"),
         Destination("more", "More")
     )
     val entry by navController.currentBackStackEntryAsState()
@@ -74,9 +73,11 @@ fun CalorieStreakNavHost(
         bottomBar = {
             NavigationBar {
                 items.forEachIndexed { index, item ->
-                    val selected = if (item.route == "more") {
-                        currentRoute == "more" || currentRoute in moreChildren
-                    } else entry?.destination?.hierarchy?.any { it.route == item.route } == true
+                    val selected = when (item.route) {
+                        "dashboard" -> currentRoute == "dashboard" || currentRoute in dashboardChildren
+                        "more" -> currentRoute == "more" || currentRoute in moreChildren
+                        else -> entry?.destination?.hierarchy?.any { it.route == item.route } == true
+                    }
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -91,7 +92,6 @@ fun CalorieStreakNavHost(
                                 0 -> Icons.Default.Dashboard
                                 1 -> Icons.Default.PostAdd
                                 2 -> Icons.Default.MenuBook
-                                3 -> Icons.Default.History
                                 else -> Icons.Default.Menu
                             }
                             Icon(icon, contentDescription = item.label)
@@ -108,7 +108,10 @@ fun CalorieStreakNavHost(
                     state = state,
                     onHistory = { navController.navigate("history") },
                     onStatistics = { navController.navigate("statistics") },
-                    onFreezeToday = appViewModel::freezeToday,
+                    onFreezeToday = {
+                        if (state.freezes == 1) featureViewModel.recordLastFreezeUsed()
+                        appViewModel.freezeToday()
+                    },
                     onDeleteMeal = appViewModel::deleteMeal
                 )
             }
@@ -127,6 +130,7 @@ fun CalorieStreakNavHost(
                     dailyLogs = state.dailyLogs,
                     weights = featureState.weights,
                     targetCalories = state.target,
+                    weightGoal = featureState.weightGoal,
                     onDelete = appViewModel::deleteMeal
                 )
             }
@@ -147,23 +151,41 @@ fun CalorieStreakNavHost(
                     recipes = state.recipes,
                     ingredients = state.ingredients,
                     items = state.groceryItems,
-                    onGenerate = appViewModel::generateGrocery,
+                    onGenerate = { recipe, multiplier ->
+                        appViewModel.generateGrocery(recipe, multiplier)
+                        featureViewModel.recordGroceryGenerated()
+                    },
                     onAddIngredient = appViewModel::addIngredientToGrocery,
-                    onToggle = appViewModel::toggleGrocery,
+                    onToggle = { item ->
+                        featureViewModel.recordGroceryToggle(state.groceryItems, item)
+                        appViewModel.toggleGrocery(item)
+                    },
                     onClear = appViewModel::clearGrocery
                 )
             }
             composable("weight") {
-                WeightScreen(featureState.weights, featureState.weightStats, featureViewModel::addWeight, featureViewModel::updateWeight, featureViewModel::deleteWeight)
+                WeightScreen(
+                    entries = featureState.weights,
+                    stats = featureState.weightStats,
+                    weightGoal = featureState.weightGoal,
+                    onAdd = featureViewModel::addWeight,
+                    onUpdate = featureViewModel::updateWeight,
+                    onDelete = featureViewModel::deleteWeight
+                )
             }
             composable("achievements") { AchievementsScreen(featureState.earned, featureViewModel::markAchievementsSeen) }
             composable("settings") {
-                SettingsScreen(state.target, state.freezeRequiredDays) { target ->
-                    featureViewModel.setTarget(target).fold(
-                        onSuccess = { appViewModel.setDailyTarget(target) },
-                        onFailure = { Result.failure(it) }
-                    )
-                }
+                SettingsScreen(
+                    calorieTarget = state.target,
+                    weightGoal = featureState.weightGoal,
+                    freezeRequiredDays = state.freezeRequiredDays,
+                    onSave = { calorieTarget, weightGoal ->
+                        featureViewModel.setGoals(calorieTarget, weightGoal).fold(
+                            onSuccess = { appViewModel.setDailyTarget(calorieTarget) },
+                            onFailure = { Result.failure(it) }
+                        )
+                    }
+                )
             }
             composable("ingredients") {
                 IngredientsScreen(

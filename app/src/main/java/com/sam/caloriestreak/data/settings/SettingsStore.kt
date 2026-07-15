@@ -15,6 +15,7 @@ private val Context.dataStore by preferencesDataStore(name = "calorie_streak_set
 
 class SettingsStore(private val context: Context) {
     private val targetKey = doublePreferencesKey("daily_target")
+    private val weightGoalKey = doublePreferencesKey("weight_goal_kg")
     private val freezeRuleCutoffKey = longPreferencesKey("freeze_rule_7_cutoff_epoch_day")
     private val freezeBaselineCountKey = intPreferencesKey("freeze_rule_7_baseline_count")
     private val freezeBaselineProgressKey = intPreferencesKey("freeze_rule_7_baseline_progress")
@@ -22,6 +23,8 @@ class SettingsStore(private val context: Context) {
     val dailyTarget: Flow<Double> = context.dataStore.data.map { preferences ->
         preferences[targetKey] ?: 1650.0
     }
+
+    val weightGoal: Flow<Double?> = context.dataStore.data.map { preferences -> preferences[weightGoalKey] }
 
     val freezeRuleBaseline: Flow<FreezeRuleBaseline?> = context.dataStore.data.map { preferences ->
         val cutoff = preferences[freezeRuleCutoffKey] ?: return@map null
@@ -36,12 +39,18 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { it[targetKey] = value }
     }
 
+    suspend fun setWeightGoal(value: Double?) {
+        context.dataStore.edit { preferences ->
+            if (value == null) preferences.remove(weightGoalKey) else preferences[weightGoalKey] = value
+        }
+    }
+
     suspend fun preserveFreezeStateForSevenDayRule(cutoffEpochDay: Long, oldSnapshot: StreakSnapshot) {
         context.dataStore.edit { preferences ->
             if (preferences[freezeRuleCutoffKey] == null) {
                 preferences[freezeRuleCutoffKey] = cutoffEpochDay
-                preferences[freezeBaselineCountKey] = oldSnapshot.freezes
-                preferences[freezeBaselineProgressKey] = oldSnapshot.progress
+                preferences[freezeBaselineCountKey] = oldSnapshot.freezes.coerceAtMost(3)
+                preferences[freezeBaselineProgressKey] = oldSnapshot.progress.coerceIn(0, 6)
             }
         }
     }

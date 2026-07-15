@@ -32,11 +32,20 @@ object DatabaseProvider {
         }
     }
 
+    private val migration3To4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS activity_events (id TEXT NOT NULL PRIMARY KEY, type TEXT NOT NULL, epochDay INTEGER NOT NULL, timestamp INTEGER NOT NULL, metadata TEXT)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_type ON activity_events(type)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_epochDay ON activity_events(epochDay)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_timestamp ON activity_events(timestamp)")
+        }
+    }
+
     @Volatile private var instance: CalorieStreakDatabase? = null
 
     fun get(context: Context): CalorieStreakDatabase = instance ?: synchronized(this) {
         instance ?: Room.databaseBuilder(context.applicationContext, CalorieStreakDatabase::class.java, "calorie_streak.db")
-            .addMigrations(migration1To2, migration2To3)
+            .addMigrations(migration1To2, migration2To3, migration3To4)
             .build()
             .also { instance = it }
     }

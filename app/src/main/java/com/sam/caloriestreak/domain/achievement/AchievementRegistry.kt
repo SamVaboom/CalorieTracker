@@ -32,49 +32,98 @@ object AchievementRegistry {
         ConsecutiveRecordingAchievementDefinition("time_420", "Blaze it", 420, "420", sortOrder = 420)
     )
 
-    val weight = listOf(
-        AchievementDefinition("weight_first", "First Weigh-In", "Every graph starts with one dot.", AchievementCategory.WEIGHT, threshold = 1.0, sortOrder = 1001),
-        AchievementDefinition("weight_7_dates", "Data Point", "Record weight on 7 different dates", AchievementCategory.WEIGHT, threshold = 7.0, sortOrder = 1002),
-        AchievementDefinition("weight_30_dates", "Trend Watcher", "Record weight on 30 different dates", AchievementCategory.WEIGHT, threshold = 30.0, sortOrder = 1003),
-        AchievementDefinition("weight_down_1", "One Down", "Record a weight at least 1 kg below the first entry", AchievementCategory.WEIGHT, threshold = 1.0, sortOrder = 1004),
-        AchievementDefinition("weight_down_5", "Five Down", "Record a weight at least 5 kg below the first entry", AchievementCategory.WEIGHT, threshold = 5.0, sortOrder = 1005),
-        AchievementDefinition("weight_down_10", "Double Digits", "Record a weight at least 10 kg below the first entry", AchievementCategory.WEIGHT, threshold = 10.0, sortOrder = 1006),
-        AchievementDefinition("weight_new_low", "New Low", "Record a new lowest weight after five earlier entries", AchievementCategory.WEIGHT, threshold = 6.0, sortOrder = 1007)
+    private val weightObjects = listOf(
+        1 to "First Step",
+        2 to "Large Watermelon",
+        3 to "Newborn baby",
+        4 to "A cat",
+        5 to "Five Down",
+        6 to "Watermelon",
+        7 to "Bowling ball",
+        8 to "Gallon of Paint",
+        9 to "Carry-on luggage",
+        10 to "Double Digits",
+        11 to "Car battery",
+        12 to "Mountain Bike",
+        13 to "Microwave",
+        14 to "Large Paint Container",
+        15 to "Cement Bag",
+        16 to "Kettlebell",
+        17 to "Checked Suitcase",
+        18 to "Car Wheel",
+        19 to "Commercial Vacuum"
     )
 
-    val mealAndRecipe = listOf(
-        AchievementDefinition("picky_eater", "Picky Eater", "Log the same saved recipe 15 times in 30 days", AchievementCategory.MEAL_HABITS, threshold = 15.0, sortOrder = 2001),
-        AchievementDefinition("creature_of_habit", "Creature of Habit", "Log the same recipe on 7 dates in 14 days", AchievementCategory.MEAL_HABITS, threshold = 7.0, sortOrder = 2002),
-        AchievementDefinition("meal_prepper", "Meal Prepper", "Log the same recipe on 3 consecutive days", AchievementCategory.MEAL_HABITS, threshold = 3.0, sortOrder = 2003),
-        AchievementDefinition("explorer", "Explorer", "Log 25 different recipes", AchievementCategory.RECIPES, threshold = 25.0, sortOrder = 2004),
-        AchievementDefinition("culinary_tourist", "Culinary Tourist", "Log 50 different recipes", AchievementCategory.RECIPES, threshold = 50.0, sortOrder = 2005),
-        AchievementDefinition("home_cook", "Home Cook", "Log 100 recipe-based meals", AchievementCategory.RECIPES, threshold = 100.0, sortOrder = 2006),
-        AchievementDefinition("master_chef", "Master Chef", "Create 50 recipes", AchievementCategory.RECIPES, threshold = 50.0, sortOrder = 2007),
-        AchievementDefinition("ingredient_collector", "Ingredient Collector", "Create 100 ingredients", AchievementCategory.RECIPES, threshold = 100.0, sortOrder = 2008)
+    val weight = buildList {
+        add(AchievementDefinition("weight_first_entry", "First Weigh-In", "Every graph starts with one dot.", AchievementCategory.WEIGHT, threshold = 1.0, sortOrder = 1000))
+        add(AchievementDefinition("weight_7_dates", "Data Point", "Record weight on 7 different dates.", AchievementCategory.WEIGHT, threshold = 7.0, sortOrder = 1001))
+        add(AchievementDefinition("weight_30_dates", "Trend Watcher", "Record weight on 30 different dates.", AchievementCategory.WEIGHT, threshold = 30.0, sortOrder = 1002))
+        weightObjects.forEach { (kilograms, title) ->
+            add(AchievementDefinition("weight_loss_${kilograms.toString().padStart(2, '0')}", title, "Your latest weight is at least $kilograms kg below your first recorded weight.", AchievementCategory.WEIGHT, threshold = kilograms.toDouble(), sortOrder = 1100 + kilograms))
+        }
+        add(AchievementDefinition("weight_halfway", "Halfway There", "Reach 50% of your configured weight-loss goal.", AchievementCategory.WEIGHT, threshold = 50.0, sortOrder = 1201))
+        add(AchievementDefinition("weight_goal", "Goal Achieved", "Reach your configured target weight.", AchievementCategory.WEIGHT, sortOrder = 1202))
+        add(AchievementDefinition("weight_phoenix", "Phoenix", "Your latest entry is a new lowest recorded weight.", AchievementCategory.WEIGHT, sortOrder = 1203))
+    }
+
+    val score = listOf(
+        AchievementDefinition("bullseye", "Bullseye", "Reach exactly 100% on a finalized day.", AchievementCategory.SCORE, sortOrder = 3001),
+        AchievementDefinition("three_in_a_row", "Three in a Row", "Reach 100% three days in a row.", AchievementCategory.SCORE, threshold = 3.0, sortOrder = 3002),
+        AchievementDefinition("perfectionist", "Perfectionist", "Reach 100% seven days in a row.", AchievementCategory.SCORE, threshold = 7.0, sortOrder = 3003),
+        AchievementDefinition("master_of_balance", "Master of Balance", "Stay between 95% and 100% for 14 consecutive days.", AchievementCategory.SCORE, threshold = 14.0, sortOrder = 3004)
     )
 
-    val calorieAndScore = listOf(
-        AchievementDefinition("fasting_monk", "Fasting Monk", "Finalize one day below 1000 kcal", AchievementCategory.CALORIES, sortOrder = 3001),
-        AchievementDefinition("enlightened_monk", "Enlightened Monk", "Finalize three days below 1000 kcal in 7 days", AchievementCategory.CALORIES, sortOrder = 3002),
-        AchievementDefinition("air_diet", "Air Diet", "Finalize one day below 800 kcal", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3003),
-        AchievementDefinition("the_american", "The American", "Finalize one day above 3000 kcal", AchievementCategory.CALORIES, sortOrder = 3004),
-        AchievementDefinition("thanksgiving", "Thanksgiving", "Finalize one day above 4000 kcal", AchievementCategory.CALORIES, sortOrder = 3005),
-        AchievementDefinition("bottomless_pit", "Bottomless Pit", "Finalize one day above 5000 kcal", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3006),
-        AchievementDefinition("bullseye", "Bullseye", "Finish one finalized day at exactly 100%", AchievementCategory.SCORE, sortOrder = 3101),
-        AchievementDefinition("double_bullseye", "Double Bullseye", "Finish exactly 100% on two consecutive days", AchievementCategory.SCORE, sortOrder = 3102),
-        AchievementDefinition("hat_trick", "Hat Trick", "Finish exactly 100% on three consecutive days", AchievementCategory.SCORE, sortOrder = 3103),
-        AchievementDefinition("balanced_week", "Balanced Week", "Finish at 85% or higher for seven consecutive days", AchievementCategory.SCORE, sortOrder = 3104),
-        AchievementDefinition("safe_passage", "Safe Passage", "Finish 30 total days at 80% or higher", AchievementCategory.SCORE, threshold = 30.0, sortOrder = 3105)
+    val calories = listOf(
+        AchievementDefinition("fasting_monk", "Fasting Monk", "Eat less than 1000 kcal in one finalized day.", AchievementCategory.CALORIES, sortOrder = 3101),
+        AchievementDefinition("enlightened_monk", "Enlightened Monk", "Eat less than 1000 kcal three times within 7 days.", AchievementCategory.CALORIES, sortOrder = 3102),
+        AchievementDefinition("air_diet", "Air Diet", "Eat less than 800 kcal in one finalized day.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3103),
+        AchievementDefinition("ghost", "Ghost", "End a finalized day with 0 logged calories.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3104),
+        AchievementDefinition("the_american", "The American", "Eat more than 3000 kcal in one finalized day.", AchievementCategory.CALORIES, sortOrder = 3110),
+        AchievementDefinition("thanksgiving", "Thanksgiving", "Eat more than 4000 kcal in one finalized day.", AchievementCategory.CALORIES, sortOrder = 3111),
+        AchievementDefinition("bottomless_pit", "Bottomless Pit", "Eat more than 5000 kcal in one finalized day.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3112),
+        AchievementDefinition("cheat_code", "Cheat Code", "Eat more than 2500 kcal on a manually frozen day.", AchievementCategory.CALORIES, sortOrder = 3113),
+        AchievementDefinition("testing_limits", "Testing limits", "Finish above the calorie target while keeping a score of at least 80%.", AchievementCategory.CALORIES, sortOrder = 3114),
+        AchievementDefinition("loophole", "Loophole", "Finish above the target while staying at 80% or higher for three consecutive days.", AchievementCategory.CALORIES, threshold = 3.0, sortOrder = 3115),
+        AchievementDefinition("no_regrets", "No Regrets", "Finish above 2200 kcal without using a freeze.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3116),
+        AchievementDefinition("lucky_seven", "Lucky Seven", "Finish a day with exactly 1666 kcal.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 3117)
+    )
+
+    val mealsAndRecipes = listOf(
+        AchievementDefinition("picky_eater", "Picky Eater", "Eat the same saved recipe 15 times within 30 days.", AchievementCategory.MEAL_HABITS, threshold = 15.0, sortOrder = 4001),
+        AchievementDefinition("creature_of_habit", "Creature of Habit", "Eat the same breakfast recipe 20 times.", AchievementCategory.MEAL_HABITS, threshold = 20.0, sortOrder = 4002),
+        AchievementDefinition("meal_prep", "Meal Prep", "Eat the same recipe three consecutive days.", AchievementCategory.MEAL_HABITS, threshold = 3.0, sortOrder = 4003),
+        AchievementDefinition("explorer", "Explorer", "Log 25 different recipes.", AchievementCategory.RECIPES, threshold = 25.0, sortOrder = 4010),
+        AchievementDefinition("chef", "Chef", "Create 25 recipes.", AchievementCategory.RECIPES, threshold = 25.0, sortOrder = 4011),
+        AchievementDefinition("master_chef", "Master Chef", "Create 100 recipes.", AchievementCategory.RECIPES, threshold = 100.0, sortOrder = 4012),
+        AchievementDefinition("ingredient_collector", "Ingredient Collector", "Add 100 ingredients.", AchievementCategory.RECIPES, threshold = 100.0, sortOrder = 4013),
+        AchievementDefinition("home_cook", "Home Cook", "Log 100 recipe-based meals.", AchievementCategory.RECIPES, threshold = 100.0, sortOrder = 4014),
+        AchievementDefinition("freestyler", "Freestyler", "Log 25 manual calorie entries.", AchievementCategory.MEAL_HABITS, threshold = 25.0, sortOrder = 4015)
+    )
+
+    val grocery = listOf(
+        AchievementDefinition("shopping_spree", "Shopping Spree", "Generate 10 grocery lists.", AchievementCategory.GROCERY, threshold = 10.0, sortOrder = 5001),
+        AchievementDefinition("organized", "Organized", "Check off every item in a grocery list.", AchievementCategory.GROCERY, sortOrder = 5002)
     )
 
     val freezes = listOf(
-        AchievementDefinition("winter_is_coming", "Winter Is Coming", "Earn the first freeze", AchievementCategory.FREEZES, sortOrder = 4001),
-        AchievementDefinition("cold_storage", "Cold Storage", "Reach the configured maximum number of freezes", AchievementCategory.FREEZES, sortOrder = 4002),
-        AchievementDefinition("close_call", "Close Call", "Protect a failed day using a freeze", AchievementCategory.FREEZES, sortOrder = 4003),
-        AchievementDefinition("ice_king", "Ice King", "Use 10 freezes", AchievementCategory.FREEZES, threshold = 10.0, sortOrder = 4004),
-        AchievementDefinition("deep_freeze", "Deep Freeze", "Use 25 freezes", AchievementCategory.FREEZES, threshold = 25.0, sortOrder = 4005),
-        AchievementDefinition("seven_good_days", "Seven Good Days", "Earn a freeze after seven qualifying days", AchievementCategory.FREEZES, threshold = 7.0, sortOrder = 4006)
+        AchievementDefinition("winter_is_coming", "Winter Is Coming", "Earn your first freeze.", AchievementCategory.FREEZES, sortOrder = 6001),
+        AchievementDefinition("cold_storage", "Cold Storage", "Store the maximum of 3 freezes.", AchievementCategory.FREEZES, sortOrder = 6002),
+        AchievementDefinition("close_call", "Close Call", "Save a failed day using a freeze.", AchievementCategory.FREEZES, sortOrder = 6003),
+        AchievementDefinition("ice_king", "Ice King", "Use 10 freezes.", AchievementCategory.FREEZES, threshold = 10.0, sortOrder = 6004),
+        AchievementDefinition("yolo", "YOLO", "Use your last remaining freeze.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 6005)
     )
 
-    val all: List<AchievementDefinition> = time.map { it.asAchievement() } + weight + mealAndRecipe + calorieAndScore + freezes
+    val funny = listOf(
+        AchievementDefinition("oops", "Oops", "Log the exact same meal twice within one minute.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 7001),
+        AchievementDefinition("night_owl", "Night Owl", "Log food between midnight and 4 AM.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 7002),
+        AchievementDefinition("breakfast_champion", "Breakfast Champion", "Log breakfast before 7 AM seven days in a row.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 7003),
+        AchievementDefinition("last_minute", "Last Minute", "Log the day's final meal between 23:50 and midnight.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 7004),
+        AchievementDefinition("deja_vu", "Déjà Vu", "Log the exact same full day of meals as the previous day.", AchievementCategory.HIDDEN, hidden = true, sortOrder = 7005),
+        AchievementDefinition("touch_grass", "Touch Grass", "Open the app on 30 consecutive calendar days.", AchievementCategory.HIDDEN, hidden = true, threshold = 30.0, sortOrder = 7006)
+    )
+
+    val all: List<AchievementDefinition> =
+        time.map { it.asAchievement() } + weight + score + calories + mealsAndRecipes + grocery + freezes + funny
+
+    val revocableWeightIds: Set<String> = weight.map { it.id }.toSet()
 }
