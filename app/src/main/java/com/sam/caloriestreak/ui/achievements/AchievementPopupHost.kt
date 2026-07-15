@@ -13,6 +13,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -216,7 +218,7 @@ private fun PopupDialogFrame(
     announcement: String,
     accent: Color,
     onClose: () -> Unit,
-    content: @Composable Column.() -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
     var entered by remember(dialogKey) { mutableStateOf(false) }
     val focusRequester = remember(dialogKey) { FocusRequester() }
@@ -224,6 +226,7 @@ private fun PopupDialogFrame(
 
     LaunchedEffect(dialogKey) {
         entered = true
+        withFrameNanos { }
         focusRequester.requestFocus()
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
