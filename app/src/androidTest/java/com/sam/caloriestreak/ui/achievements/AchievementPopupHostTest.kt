@@ -7,11 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -82,7 +82,7 @@ class AchievementPopupHostTest {
         }
         pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("achievement_popup_card").assertDoesNotExist()
+        composeRule.onAllNodesWithTag("achievement_popup_card").assertCountEquals(0)
     }
 
     @Test fun outsideTapDoesNotDismissPopup() {
@@ -111,6 +111,6 @@ class AchievementPopupHostTest {
             }
         }
         composeRule.onNodeWithText("12 achievements unlocked from your existing history.").assertIsDisplayed()
-        composeRule.onNodeWithText("Bullseye").assertDoesNotExist()
+        composeRule.onAllNodesWithText("Bullseye").assertCountEquals(0)
     }
 }
