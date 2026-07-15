@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -16,7 +17,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.click
 import androidx.test.espresso.Espresso.pressBack
 import com.sam.caloriestreak.data.local.entity.AchievementPopupSummaryEntity
 import com.sam.caloriestreak.data.local.entity.EarnedAchievementEntity
@@ -98,7 +98,7 @@ class AchievementPopupHostTest {
     }
 
     @Test fun retroactiveBulkUnlockShowsOneSummaryInsteadOfIndividuals() {
-        var summary by mutableStateOf(AchievementPopupSummaryEntity("summary", 12, 1L))
+        var summary by mutableStateOf<AchievementPopupSummaryEntity?>(AchievementPopupSummaryEntity("summary", 12, 1L))
         composeRule.setContent {
             CalorieStreakTheme {
                 AchievementPopupHost(
