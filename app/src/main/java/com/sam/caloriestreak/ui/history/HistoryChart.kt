@@ -24,10 +24,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.domain.history.HistoryMetric
 import com.sam.caloriestreak.domain.history.HistoryPoint
+import com.sam.caloriestreak.ui.theme.AppColors
+import com.sam.caloriestreak.ui.theme.AppDimensions
 import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.max
@@ -40,16 +44,14 @@ fun HistoryChart(
     modifier: Modifier = Modifier
 ) {
     var selectedIndex by remember { mutableIntStateOf(points.lastIndex.coerceAtLeast(0)) }
-    LaunchedEffect(points, metric) {
-        selectedIndex = points.lastIndex.coerceAtLeast(0)
-    }
+    LaunchedEffect(points, metric) { selectedIndex = points.lastIndex.coerceAtLeast(0) }
 
     val selected = points.getOrNull(selectedIndex)
-    val lineColor = MaterialTheme.colorScheme.primary
-    val pointColor = MaterialTheme.colorScheme.secondary
-    val freezeColor = MaterialTheme.colorScheme.tertiary
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
-    val referenceColor = MaterialTheme.colorScheme.outline
+    val lineColor = if (metric == HistoryMetric.SCORE) AppColors.Violet else AppColors.Coral
+    val pointColor = if (metric == HistoryMetric.SCORE) AppColors.Cyan else AppColors.Warning
+    val freezeColor = AppColors.Freeze
+    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    val referenceColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
     val density = LocalDensity.current
 
     Column(modifier) {
@@ -59,10 +61,10 @@ fun HistoryChart(
                 HistoryMetric.CALORIES -> "${selected.calories.toInt()} kcal"
             }
             Text(
-                text = "${LocalDate.ofEpochDay(selected.epochDay)} · $valueText" +
-                    if (selected.freezeProtected) " · Freeze protected" else "",
+                text = "${LocalDate.ofEpochDay(selected.epochDay)} · $valueText" + if (selected.freezeProtected) " · Freeze protected" else "",
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                color = lineColor,
+                modifier = Modifier.padding(bottom = AppDimensions.Space8)
             )
         }
 
@@ -83,15 +85,15 @@ fun HistoryChart(
                     modifier = Modifier
                         .width(canvasWidth)
                         .height(240.dp)
+                        .semantics {
+                            contentDescription = "${metric.label} history graph with ${points.size} points. Tap a point for details."
+                        }
                         .pointerInput(points, metric, canvasWidth) {
                             detectTapGestures { tap ->
                                 if (points.isEmpty()) return@detectTapGestures
                                 val usableWidth = size.width - leftPaddingPx - rightPaddingPx
                                 val step = if (points.size <= 1) 1f else usableWidth / (points.size - 1)
-                                val nearest = points.indices.minByOrNull { index ->
-                                    abs(tap.x - (leftPaddingPx + index * step))
-                                }
-                                if (nearest != null) selectedIndex = nearest
+                                selectedIndex = points.indices.minByOrNull { index -> abs(tap.x - (leftPaddingPx + index * step)) } ?: selectedIndex
                             }
                         }
                 ) {
@@ -101,10 +103,7 @@ fun HistoryChart(
                     val usableWidth = size.width - leftPaddingPx - rightPaddingPx
                     val maxValue = when (metric) {
                         HistoryMetric.SCORE -> 100.0
-                        HistoryMetric.CALORIES -> max(
-                            targetCalories * 1.2,
-                            points.maxOfOrNull { it.calories }?.times(1.1) ?: targetCalories
-                        )
+                        HistoryMetric.CALORIES -> max(targetCalories * 1.2, points.maxOfOrNull { it.calories }?.times(1.1) ?: targetCalories)
                     }.coerceAtLeast(1.0)
 
                     repeat(5) { index ->
@@ -119,12 +118,7 @@ fun HistoryChart(
                     }
                     references.forEach { value ->
                         val y = yFor(value)
-                        drawLine(
-                            color = referenceColor,
-                            start = Offset(leftPaddingPx, y),
-                            end = Offset(size.width - rightPaddingPx, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
+                        drawLine(referenceColor, Offset(leftPaddingPx, y), Offset(size.width - rightPaddingPx, y), 1.dp.toPx())
                     }
 
                     val step = if (points.size <= 1) 0f else usableWidth / (points.size - 1)
@@ -139,22 +133,26 @@ fun HistoryChart(
                     points.forEachIndexed { index, point ->
                         val x = leftPaddingPx + index * step
                         val y = yFor(point.value(metric))
-                        val radius = if (index == selectedIndex) 6.dp.toPx() else 4.dp.toPx()
-                        drawCircle(
-                            color = if (point.freezeProtected) freezeColor else pointColor,
-                            radius = radius,
-                            center = Offset(x, y)
-                        )
+                        drawCircle(if (point.freezeProtected) freezeColor else pointColor, if (index == selectedIndex) 6.dp.toPx() else 4.dp.toPx(), Offset(x, y))
                     }
                 }
                 Row(
-                    modifier = Modifier.width(canvasWidth).padding(horizontal = 12.dp),
+                    modifier = Modifier.width(canvasWidth).padding(horizontal = AppDimensions.Space12),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
                 ) {
-                    Text(points.firstOrNull()?.let { LocalDate.ofEpochDay(it.epochDay).toString() }.orEmpty())
-                    Text(points.lastOrNull()?.let { LocalDate.ofEpochDay(it.epochDay).toString() }.orEmpty())
+                    Text(points.firstOrNull()?.let { LocalDate.ofEpochDay(it.epochDay).toString() }.orEmpty(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(points.lastOrNull()?.let { LocalDate.ofEpochDay(it.epochDay).toString() }.orEmpty(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+        Text(
+            when (metric) {
+                HistoryMetric.SCORE -> "Reference lines: 80% streak-safe and 85% freeze-qualifying"
+                HistoryMetric.CALORIES -> "Reference line: ${targetCalories.toInt()} kcal target"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = AppDimensions.Space8)
+        )
     }
 }
