@@ -1,5 +1,6 @@
 package com.sam.caloriestreak.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -15,9 +16,9 @@ data class EarnedAchievementEntity(
     val triggeringEpochDay: Long?,
     val progressAtUnlock: Double?,
     val seen: Boolean = false,
-    val popupDismissed: Boolean = false,
-    val popupSuppressed: Boolean = false,
-    val unlockSource: String = UnlockSource.LIVE
+    @ColumnInfo(defaultValue = "1") val popupDismissed: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val popupSuppressed: Boolean = false,
+    @ColumnInfo(defaultValue = "'LEGACY'") val unlockSource: String = UnlockSource.LIVE
 )
 
 object UnlockSource {
