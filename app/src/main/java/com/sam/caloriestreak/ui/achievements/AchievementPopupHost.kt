@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -206,7 +207,10 @@ private fun AchievementSummaryDialog(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(AppDimensions.Space20))
-        Button(onClick = onOpenAchievements, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = onOpenAchievements,
+            modifier = Modifier.fillMaxWidth().testTag("achievement_popup_open_achievements")
+        ) {
             Text("Open Achievements")
         }
     }
@@ -242,6 +246,7 @@ private fun PopupDialogFrame(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .testTag("achievement_popup_scrim")
                 .background(Color.Black.copy(alpha = 0.72f))
                 .padding(AppDimensions.Space16),
             contentAlignment = Alignment.Center
@@ -256,6 +261,7 @@ private fun PopupDialogFrame(
                         .fillMaxWidth()
                         .widthIn(max = 420.dp)
                         .heightIn(max = 620.dp)
+                        .testTag("achievement_popup_card")
                         .focusRequester(focusRequester)
                         .focusable()
                         .semantics {
@@ -283,6 +289,7 @@ private fun PopupDialogFrame(
                                 .align(Alignment.TopEnd)
                                 .padding(AppDimensions.Space8)
                                 .size(AppDimensions.TouchTarget)
+                                .testTag("achievement_popup_close")
                         ) {
                             Icon(Icons.Default.Close, contentDescription = "Close achievement popup")
                         }
