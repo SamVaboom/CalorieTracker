@@ -14,5 +14,14 @@ data class EarnedAchievementEntity(
     val earnedAt: Long,
     val triggeringEpochDay: Long?,
     val progressAtUnlock: Double?,
-    val seen: Boolean = false
+    val seen: Boolean = false,
+    val popupDismissed: Boolean = false,
+    val popupSuppressed: Boolean = false,
+    val unlockSource: String = UnlockSource.LIVE
 )
+
+object UnlockSource {
+    const val LIVE = "LIVE"
+    const val RECONCILIATION = "RECONCILIATION"
+    const val LEGACY = "LEGACY"
+}
