@@ -17,5 +17,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Run tests and build debug APK
-        run: gradle test assembleDebug --console=plain
+      - name: Run tests and build debug APKs
+        run: gradle test assembleDebug assembleDebugAndroidTest --console=plain
