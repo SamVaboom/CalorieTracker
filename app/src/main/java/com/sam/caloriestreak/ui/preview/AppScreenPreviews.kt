@@ -13,6 +13,7 @@ import com.sam.caloriestreak.ui.grocery.GroceryScreen
 import com.sam.caloriestreak.ui.history.HistoryScreen
 import com.sam.caloriestreak.ui.ingredients.IngredientsScreen
 import com.sam.caloriestreak.ui.meal_log.LogFoodScreen
+import com.sam.caloriestreak.ui.meal_log.ProteinCorrectionScreen
 import com.sam.caloriestreak.ui.more.MoreScreen
 import com.sam.caloriestreak.ui.recipes.RecipesScreen
 import com.sam.caloriestreak.ui.settings.SettingsScreen
@@ -112,10 +113,16 @@ private fun GroceryPreview() {
     CalorieStreakTheme { GroceryScreen(emptyList(), emptyList(), emptyList(), { _, _ -> }, {}, {}, {}) }
 }
 
+@Preview(name = "Protein corrections empty", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
+@Composable
+private fun ProteinCorrectionsPreview() {
+    CalorieStreakTheme { ProteinCorrectionScreen(emptyList(), {}, { Result.success(Unit) }, { _, _ -> Result.success(Unit) }) }
+}
+
 @Preview(name = "More", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
 @Composable
 private fun MorePreview() {
-    CalorieStreakTheme { MoreScreen(94.2, 12, 115, 2, {}, {}, {}, {}) }
+    CalorieStreakTheme { MoreScreen(94.2, 12, 115, 2, {}, {}, {}, {}, {}) }
 }
 
 @Preview(name = "Settings", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
