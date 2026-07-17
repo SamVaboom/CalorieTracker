@@ -25,7 +25,7 @@ class RoomMigrationTest {
     )
 
     @Test
-    fun migrateVersion1To5_preservesIngredientAndValidatesEverySchema() {
+    fun migrateVersion1To6_preservesIngredientAndStartsProteinUnknown() {
         helper.createDatabase(databaseName, 1).apply {
             execSQL(
                 """
@@ -41,22 +41,23 @@ class RoomMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            5,
+            6,
             true,
             *DatabaseProvider.ALL_MIGRATIONS
         )
 
-        migrated.query("SELECT name, calories, brand FROM ingredients WHERE id = 'ingredient-1'").use { cursor ->
+        migrated.query("SELECT name, calories, brand, proteinPerReferenceAmount FROM ingredients WHERE id = 'ingredient-1'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Mozzarella", cursor.getString(0))
             assertEquals(280.0, cursor.getDouble(1), 0.0001)
             assertEquals("Legacy brand", cursor.getString(2))
+            assertTrue(cursor.isNull(3))
         }
         migrated.close()
     }
 
     @Test
-    fun migrateVersion2To5_preservesRecipesMealsCaloriesAndDailyState() {
+    fun migrateVersion2To6_preservesRecipesMealsCaloriesAndDailyState() {
         helper.createDatabase(databaseName, 2).apply {
             seedVersion2Data(this)
             close()
@@ -64,11 +65,12 @@ class RoomMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            5,
+            6,
             true,
             DatabaseProvider.MIGRATION_2_3,
             DatabaseProvider.MIGRATION_3_4,
-            DatabaseProvider.MIGRATION_4_5
+            DatabaseProvider.MIGRATION_4_5,
+            DatabaseProvider.MIGRATION_5_6
         )
 
         assertSingleValue(migrated, "SELECT COUNT(*) FROM ingredients", 1L)
@@ -77,9 +79,12 @@ class RoomMigrationTest {
         assertSingleValue(migrated, "SELECT COUNT(*) FROM meal_logs", 1L)
         assertSingleValue(migrated, "SELECT COUNT(*) FROM grocery_items", 1L)
         assertSingleValue(migrated, "SELECT COUNT(*) FROM daily_logs", 1L)
-        migrated.query("SELECT calories FROM meal_logs WHERE id = 'meal-1'").use { cursor ->
+        migrated.query("SELECT calories, proteinGramsSnapshot, proteinDataComplete, missingProteinItemCount FROM meal_logs WHERE id = 'meal-1'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals(420.5, cursor.getDouble(0), 0.0001)
+            assertTrue(cursor.isNull(1))
+            assertEquals(0, cursor.getInt(2))
+            assertEquals(0, cursor.getInt(3))
         }
         migrated.query("SELECT totalCalories, score, freezeUsed FROM daily_logs WHERE dateEpochDay = 20000").use { cursor ->
             assertTrue(cursor.moveToFirst())
@@ -91,7 +96,7 @@ class RoomMigrationTest {
     }
 
     @Test
-    fun migrateVersion4To5_preservesWeightAchievementsAndActivity() {
+    fun migrateVersion4To6_preservesWeightAchievementsAndActivity() {
         helper.createDatabase(databaseName, 4).apply {
             execSQL("INSERT INTO weight_entries VALUES ('weight-1', 94.2, 1000, 'note', 1000, 1000)")
             execSQL("INSERT INTO earned_achievements VALUES ('earned-1', 'bullseye', 1000, 20000, 100.0, 0)")
@@ -101,9 +106,10 @@ class RoomMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            5,
+            6,
             true,
-            DatabaseProvider.MIGRATION_4_5
+            DatabaseProvider.MIGRATION_4_5,
+            DatabaseProvider.MIGRATION_5_6
         )
 
         assertSingleValue(migrated, "SELECT COUNT(*) FROM weight_entries", 1L)
@@ -113,6 +119,59 @@ class RoomMigrationTest {
             assertEquals(1, cursor.getInt(0))
             assertEquals(0, cursor.getInt(1))
             assertEquals("LEGACY", cursor.getString(2))
+        }
+        migrated.close()
+    }
+
+    @Test
+    fun migrateVersion5To6_keepsAllExistingRowsAndUnknownProteinIsNotZero() {
+        helper.createDatabase(databaseName, 5).apply {
+            execSQL(
+                """
+                INSERT INTO ingredients (
+                    id, name, brand, calories, referenceAmount, referenceUnit,
+                    category, favorite, archived, createdAt, updatedAt
+                ) VALUES ('ingredient-5', 'Tomato sauce', NULL, 45.0, 100.0, 'g',
+                    'Sauce', 0, 0, 10, 10)
+                """.trimIndent()
+            )
+            execSQL("INSERT INTO recipes VALUES ('recipe-5', 'Pizza', NULL, 2.0, 0, 0, 10, 10)")
+            execSQL("INSERT INTO recipe_items VALUES ('item-5', 'recipe-5', 'ingredient-5', 'Tomato sauce', 200.0, 'g', NULL)")
+            execSQL(
+                """
+                INSERT INTO meal_logs (
+                    id, dateEpochDay, timeMillis, recipeId, recipeName,
+                    portionDescription, portionMultiplier, calories, note, createdAt, updatedAt
+                ) VALUES ('meal-5', 20000, 1000, 'recipe-5', 'Pizza', '1 serving', 0.5,
+                    90.0, NULL, 1000, 1000)
+                """.trimIndent()
+            )
+            execSQL("INSERT INTO weight_entries VALUES ('weight-5', 92.0, 1000, NULL, 1000, 1000)")
+            execSQL("INSERT INTO earned_achievements VALUES ('earned-5', 'bullseye', 1000, 20000, 100.0, 0, 1, 0, 'LEGACY')")
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            databaseName,
+            6,
+            true,
+            DatabaseProvider.MIGRATION_5_6
+        )
+
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM ingredients", 1L)
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM recipes", 1L)
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM recipe_items", 1L)
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM meal_logs", 1L)
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM weight_entries", 1L)
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM earned_achievements", 1L)
+        migrated.query("SELECT calories, proteinGramsSnapshot FROM meal_logs WHERE id = 'meal-5'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(90.0, cursor.getDouble(0), 0.0001)
+            assertTrue(cursor.isNull(1))
+        }
+        migrated.query("SELECT proteinPerReferenceAmount FROM ingredients WHERE id = 'ingredient-5'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
         }
         migrated.close()
     }
