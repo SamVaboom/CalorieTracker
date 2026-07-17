@@ -22,6 +22,9 @@ import com.sam.caloriestreak.domain.editing.IngredientDraft
 import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.domain.editing.RecipeIngredientDraft
 import com.sam.caloriestreak.domain.editing.UnitConverter
+import com.sam.caloriestreak.domain.protein.IngredientProteinCalculator
+import com.sam.caloriestreak.domain.protein.ProteinSummary
+import com.sam.caloriestreak.domain.protein.RecipeProteinCalculator
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.SharingStarted
@@ -82,26 +85,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     item.copy(ingredientName = ingredient.name)
                 } ?: item
             }
-            val total = recipeItems.sumOf { item ->
+            val ingredientDetails = recipeItems.map { item ->
                 val ingredient = ingredientMap[item.ingredientId]
-                if (ingredient == null) 0.0 else {
-                    val convertedAmount = UnitConverter.convert(
-                        amount = item.amount,
-                        fromUnit = item.unit,
-                        toUnit = ingredient.referenceUnit
-                    ) ?: 0.0
+                val convertedAmount = ingredient?.let {
+                    UnitConverter.convert(item.amount, item.unit, it.referenceUnit)
+                }
+                val calories = if (ingredient == null || convertedAmount == null) 0.0 else {
                     IngredientCalorieCalculator.calories(
                         ingredient.calories,
                         ingredient.referenceAmount,
                         convertedAmount
                     )
                 }
+                val protein = ingredient?.let { IngredientProteinCalculator.grams(it, item.amount, item.unit) }
+                RecipeIngredientSummary(
+                    item = item,
+                    calories = calories,
+                    proteinGrams = protein,
+                    proteinAssigned = ingredient?.proteinPerReferenceAmount != null && protein != null
+                )
             }
+            val total = ingredientDetails.sumOf { it.calories }
+            val protein = RecipeProteinCalculator.calculate(recipeItems, ingredientMap)
             RecipeSummary(
                 recipe = recipe,
                 items = recipeItems,
                 totalCalories = total,
-                caloriesPerServing = RecipeCalorieCalculator.perServing(total, recipe.servings)
+                caloriesPerServing = RecipeCalorieCalculator.perServing(total, recipe.servings),
+                ingredientDetails = ingredientDetails,
+                knownProteinGrams = protein.knownGrams,
+                proteinDataComplete = protein.complete,
+                missingProteinItemCount = protein.missingIngredientCount,
+                proteinPerServing = protein.perServing(recipe.servings)
             )
         }
         val today = LocalDate.now().toEpochDay()
@@ -209,21 +224,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logRecipe(summary: RecipeSummary, multiplier: Double, description: String) {
         if (multiplier <= 0) return
+        val recipeProtein = ProteinSummary(
+            knownGrams = summary.knownProteinGrams,
+            complete = summary.proteinDataComplete,
+            missingCount = summary.missingProteinItemCount,
+            hasKnownData = summary.ingredientDetails.any { it.proteinGrams != null }
+        )
+        val portionProtein = ProteinSummary(
+            knownGrams = recipeProtein.knownGrams * multiplier,
+            complete = recipeProtein.complete,
+            missingCount = recipeProtein.missingCount,
+            hasKnownData = recipeProtein.hasKnownData
+        )
         saveMeal(
             recipeId = summary.recipe.id,
             name = summary.recipe.name,
             portion = description,
             multiplier = multiplier,
-            calories = RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier)
+            calories = RecipeCalorieCalculator.forFraction(summary.totalCalories, multiplier),
+            protein = portionProtein.knownGrams.takeIf { portionProtein.hasKnownData },
+            proteinComplete = portionProtein.complete,
+            missingProteinItemCount = portionProtein.missingCount
         )
     }
 
-    fun logManual(description: String, calories: Double) {
-        if (description.isBlank() || calories < 0) return
-        saveMeal(null, description.trim(), "Manual", 1.0, calories)
+    fun logManual(description: String, calories: Double, proteinGrams: Double? = null) {
+        if (description.isBlank() || calories < 0 || (proteinGrams != null && proteinGrams < 0)) return
+        saveMeal(
+            recipeId = null,
+            name = description.trim(),
+            portion = "Manual",
+            multiplier = 1.0,
+            calories = calories,
+            protein = proteinGrams,
+            proteinComplete = proteinGrams != null,
+            missingProteinItemCount = if (proteinGrams == null) 1 else 0
+        )
     }
 
-    private fun saveMeal(recipeId: String?, name: String, portion: String, multiplier: Double, calories: Double) {
+    private fun saveMeal(
+        recipeId: String?,
+        name: String,
+        portion: String,
+        multiplier: Double,
+        calories: Double,
+        protein: Double?,
+        proteinComplete: Boolean,
+        missingProteinItemCount: Int
+    ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             appDao.upsertMeal(
@@ -236,6 +284,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     portionDescription = portion,
                     portionMultiplier = multiplier,
                     calories = calories,
+                    proteinGramsSnapshot = protein,
+                    proteinDataComplete = proteinComplete,
+                    missingProteinItemCount = missingProteinItemCount,
                     createdAt = now,
                     updatedAt = now
                 )
