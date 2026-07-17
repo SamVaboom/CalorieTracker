@@ -29,6 +29,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sam.caloriestreak.ui.AppViewModel
 import com.sam.caloriestreak.ui.FeatureViewModel
+import com.sam.caloriestreak.ui.MealProteinCorrectionViewModel
 import com.sam.caloriestreak.ui.achievements.AchievementPopupHost
 import com.sam.caloriestreak.ui.achievements.AchievementsScreen
 import com.sam.caloriestreak.ui.dashboard.DashboardScreen
@@ -49,7 +50,8 @@ private val moreChildren = setOf("grocery", "weight", "achievements", "settings"
 @Composable
 fun CalorieStreakNavHost(
     appViewModel: AppViewModel = viewModel(),
-    featureViewModel: FeatureViewModel = viewModel()
+    featureViewModel: FeatureViewModel = viewModel(),
+    proteinCorrectionViewModel: MealProteinCorrectionViewModel = viewModel()
 ) {
     val navController = rememberNavController()
     val state by appViewModel.state.collectAsStateWithLifecycle()
@@ -119,7 +121,9 @@ fun CalorieStreakNavHost(
                             if (state.freezes == 1) featureViewModel.recordLastFreezeUsed()
                             appViewModel.freezeToday()
                         },
-                        onDeleteMeal = appViewModel::deleteMeal
+                        onDeleteMeal = appViewModel::deleteMeal,
+                        onRecalculateProtein = proteinCorrectionViewModel::recalculateRecipeProtein,
+                        onSetManualProtein = proteinCorrectionViewModel::setManualProtein
                     )
                 }
                 composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual) }
