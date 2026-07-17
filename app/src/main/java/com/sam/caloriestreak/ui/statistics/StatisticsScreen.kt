@@ -17,9 +17,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
 import com.sam.caloriestreak.domain.calculation.ScoreDisplay
+import com.sam.caloriestreak.domain.protein.ProteinFormatter
+import com.sam.caloriestreak.domain.protein.ProteinRangeStatistics
+import com.sam.caloriestreak.domain.protein.ProteinStatisticsCalculator
 import com.sam.caloriestreak.domain.weight.WeightStats
 import com.sam.caloriestreak.ui.components.AppCard
 import com.sam.caloriestreak.ui.components.AppSectionHeader
@@ -31,12 +35,18 @@ import java.time.LocalDate
 import java.util.Date
 
 private enum class StatisticsSection(val label: String) {
-    ALL("All"), CALORIES("Calories"), STREAKS("Streaks & Freezes"), WEIGHT("Weight"), ACHIEVEMENTS("Achievements")
+    ALL("All"),
+    CALORIES("Calories"),
+    STREAKS("Streaks & Freezes"),
+    WEIGHT("Weight"),
+    PROTEIN("Protein"),
+    ACHIEVEMENTS("Achievements")
 }
 
 @Composable
 fun StatisticsScreen(
     meals: List<MealLogEntity>,
+    ingredients: List<IngredientEntity>,
     currentStreak: Int,
     bestStreak: Int,
     targetCalories: Double,
@@ -56,6 +66,9 @@ fun StatisticsScreen(
     val average7Score = ScoreDisplay.percent(last7.map(calculator::calculate).average())
     val average30Score = ScoreDisplay.percent(last30.map(calculator::calculate).average())
     val completion = if (totalAchievements > 0) earnedAchievements * 100 / totalAchievements else 0
+    val protein = remember(meals, ingredients, today) {
+        ProteinStatisticsCalculator.calculate(meals, ingredients, today)
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(AppDimensions.ScreenPadding),
@@ -141,6 +154,49 @@ fun StatisticsScreen(
             }
         }
 
+        if (section == StatisticsSection.ALL || section == StatisticsSection.PROTEIN) {
+            item {
+                AppSectionHeader(
+                    "Protein",
+                    subtitle = if (protein.historicalDataIncomplete) "Known protein only; some historical entries are incomplete" else "Informational only — no target or success state"
+                )
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard(
+                        "Today",
+                        if (protein.today.hasKnownData) ProteinFormatter.grams(protein.today.knownGrams) else "Unknown",
+                        Modifier.weight(1f),
+                        if (protein.today.complete) "Complete" else "Known amount only",
+                        AppColors.Cyan
+                    )
+                    AppStatCard(
+                        "Highest day",
+                        protein.highestKnownDayGrams?.let(ProteinFormatter::grams) ?: "—",
+                        Modifier.weight(1f),
+                        "Highest meal: ${protein.highestKnownMealGrams?.let(ProteinFormatter::grams) ?: "—"}",
+                        AppColors.Cyan
+                    )
+                }
+            }
+            item { ProteinRangeCard("Last 7 days", protein.last7Days) }
+            item { ProteinRangeCard("Last 30 days", protein.last30Days) }
+            item { ProteinRangeCard("Past year", protein.lastYear) }
+            item { ProteinRangeCard("All time", protein.allTime) }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("100 g days", protein.daysAtLeast100Grams.toString(), Modifier.weight(1f), accent = AppColors.Cyan)
+                    AppStatCard(
+                        "Ingredient coverage",
+                        "${protein.activeIngredientsAssignedPercent.toInt()}%",
+                        Modifier.weight(1f),
+                        "${protein.activeIngredientsAssigned} assigned · ${protein.activeIngredientsMissing} missing",
+                        AppColors.Warning
+                    )
+                }
+            }
+        }
+
         if (section == StatisticsSection.ALL || section == StatisticsSection.ACHIEVEMENTS) {
             item { AppSectionHeader("Achievements") }
             item {
@@ -153,6 +209,16 @@ fun StatisticsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProteinRangeCard(title: String, range: ProteinRangeStatistics) {
+    AppCard(Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        StatLine("Known protein", ProteinFormatter.lifetime(range.knownTotalGrams))
+        StatLine("Recorded days", range.recordedDayCount.toString())
+        StatLine("Known average / recorded day", ProteinFormatter.grams(range.knownAveragePerRecordedDay))
     }
 }
 

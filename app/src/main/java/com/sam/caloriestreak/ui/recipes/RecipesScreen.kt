@@ -1,6 +1,13 @@
 package com.sam.caloriestreak.ui.recipes
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,15 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,14 +47,18 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.domain.editing.RecipeIngredientDraft
 import com.sam.caloriestreak.domain.editing.UnitConverter
+import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.domain.search.SearchMatcher
 import com.sam.caloriestreak.ui.RecipeSummary
 import com.sam.caloriestreak.ui.components.AppEmptyState
@@ -64,12 +79,21 @@ fun RecipesScreen(
     var showDialog by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var expandedRecipeIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val filteredRecipes = remember(recipes, query, showArchived) {
         recipes.filter { showArchived || !it.recipe.archived }
             .filter { SearchMatcher.matches(query, it.recipe.name, it.recipe.description) }
             .sortedWith(compareByDescending<RecipeSummary> { it.recipe.favorite }.thenBy { it.recipe.archived }.thenBy { it.recipe.name.lowercase() })
+    }
+
+    fun toggleExpanded(recipeId: String) {
+        expandedRecipeIds = if (recipeId in expandedRecipeIds) {
+            expandedRecipeIds - recipeId
+        } else {
+            expandedRecipeIds + recipeId
+        }
     }
 
     Scaffold(
@@ -98,10 +122,7 @@ fun RecipesScreen(
             item { FilterChip(selected = showArchived, onClick = { showArchived = !showArchived }, label = { Text("Show archived") }) }
             if (ingredients.none { !it.archived }) {
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                        shape = MaterialTheme.shapes.large
-                    ) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), shape = MaterialTheme.shapes.large) {
                         Text("Add an active ingredient before creating a recipe.", modifier = Modifier.padding(AppDimensions.Space16))
                     }
                 }
@@ -116,42 +137,16 @@ fun RecipesScreen(
                 }
             }
             items(filteredRecipes, key = { it.recipe.id }) { summary ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    border = BorderStroke(1.dp, if (summary.recipe.favorite) AppColors.Violet.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(AppDimensions.Space16), verticalAlignment = Alignment.Top) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space4)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    summary.recipe.name + if (summary.recipe.archived) " · Archived" else "",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                if (summary.recipe.favorite) {
-                                    Icon(Icons.Outlined.Favorite, contentDescription = "Favorite recipe", tint = AppColors.Violet, modifier = Modifier.padding(start = AppDimensions.Space8))
-                                }
-                            }
-                            summary.recipe.description?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(
-                                "${summary.caloriesPerServing.toInt()} kcal per serving",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = AppColors.Coral
-                            )
-                            Text(
-                                "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(onClick = { editing = summary; showDialog = true }) {
-                            Icon(Icons.Outlined.Edit, contentDescription = "Edit ${summary.recipe.name}")
-                        }
+                val expanded = summary.recipe.id in expandedRecipeIds
+                RecipeCard(
+                    summary = summary,
+                    expanded = expanded,
+                    onToggleExpanded = { toggleExpanded(summary.recipe.id) },
+                    onEdit = {
+                        editing = summary
+                        showDialog = true
                     }
-                }
+                )
             }
         }
     }
@@ -168,6 +163,112 @@ fun RecipesScreen(
                 scope.launch { snackbarHostState.showSnackbar(if (wasEditing) "Recipe updated" else "Recipe added") }
             }
         )
+    }
+}
+
+@Composable
+private fun RecipeCard(
+    summary: RecipeSummary,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .semantics { contentDescription = "${summary.recipe.name} recipe, ${if (expanded) "expanded" else "collapsed"}" },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = BorderStroke(1.dp, if (summary.recipe.favorite) AppColors.Violet.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(AppDimensions.Space16), verticalAlignment = Alignment.Top) {
+            Column(
+                modifier = Modifier.weight(1f).clickable(onClick = onToggleExpanded),
+                verticalArrangement = Arrangement.spacedBy(AppDimensions.Space4)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        summary.recipe.name + if (summary.recipe.archived) " · Archived" else "",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (summary.recipe.favorite) {
+                        Icon(Icons.Outlined.Favorite, contentDescription = "Favorite recipe", tint = AppColors.Violet, modifier = Modifier.padding(start = AppDimensions.Space8))
+                    }
+                }
+                summary.recipe.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
+                Text(
+                    "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onToggleExpanded) {
+                Icon(
+                    if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = if (expanded) "Collapse ${summary.recipe.name}" else "Expand ${summary.recipe.name}"
+                )
+            }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Outlined.Edit, contentDescription = "Edit ${summary.recipe.name}")
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(Modifier.fillMaxWidth().padding(start = AppDimensions.Space16, end = AppDimensions.Space16, bottom = AppDimensions.Space16)) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Ingredients", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = AppDimensions.Space12, bottom = AppDimensions.Space8))
+                summary.ingredientDetails.forEach { detail ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = AppDimensions.Space8),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(detail.item.ingredientName, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                buildString {
+                                    append("${detail.calories.toInt()} kcal · ")
+                                    append(detail.proteinGrams?.let { "${ProteinFormatter.grams(it)} protein" } ?: "Protein not assigned")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (detail.proteinAssigned) AppColors.Cyan else AppColors.Warning
+                            )
+                        }
+                        Text("${detail.item.amount} ${detail.item.unit}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("${summary.totalCalories.toInt()} kcal total · ${summary.caloriesPerServing.toInt()} kcal per serving", modifier = Modifier.padding(top = AppDimensions.Space12))
+                Text(
+                    when {
+                        summary.proteinDataComplete -> "${ProteinFormatter.grams(summary.knownProteinGrams)} total · ${ProteinFormatter.grams(summary.proteinPerServing ?: 0.0)} per serving"
+                        summary.knownProteinGrams > 0.0 -> "${ProteinFormatter.grams(summary.knownProteinGrams)} known protein"
+                        else -> "Protein not assigned"
+                    },
+                    color = if (summary.proteinDataComplete) AppColors.Cyan else AppColors.Warning,
+                    modifier = Modifier.padding(top = AppDimensions.Space4)
+                )
+                if (!summary.proteinDataComplete) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = AppDimensions.Space4)) {
+                        Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = AppColors.Warning)
+                        Text(
+                            "Protein data incomplete: ${summary.missingProteinItemCount} ingredient${if (summary.missingProteinItemCount == 1) "" else "s"} missing",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AppColors.Warning,
+                            modifier = Modifier.padding(start = AppDimensions.Space4)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -208,7 +309,7 @@ private fun RecipeDialog(
     val dirty = draft != initial
     val filteredIngredients = remember(ingredients, ingredientQuery, showArchivedIngredients, selected.toMap()) {
         ingredients.filter { !it.archived || showArchivedIngredients || selected[it.id] == true }
-            .filter { SearchMatcher.matches(ingredientQuery, it.name, it.brand, it.category) }
+            .filter { SearchMatcher.matches(ingredientQuery, it.name, it.category) }
             .sortedWith(compareBy<IngredientEntity> { it.archived }.thenBy { it.name.lowercase() })
     }
 
@@ -250,7 +351,8 @@ private fun RecipeDialog(
                     val compatible = UnitConverter.areCompatible(unitValue, ingredient.referenceUnit)
                     Card(
                         colors = CardDefaults.cardColors(containerColor = if (chosen) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainer),
-                        shape = MaterialTheme.shapes.medium
+                        shape = MaterialTheme.shapes.medium,
+                        border = if (ingredient.proteinPerReferenceAmount == null) BorderStroke(1.dp, AppColors.Warning.copy(alpha = 0.45f)) else null
                     ) {
                         Row(Modifier.fillMaxWidth().padding(AppDimensions.Space12), verticalAlignment = Alignment.Top) {
                             Checkbox(
@@ -262,6 +364,12 @@ private fun RecipeDialog(
                             )
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
                                 Text(ingredient.name + if (ingredient.archived) " · Archived" else "", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    ingredient.proteinPerReferenceAmount?.let { "${ProteinFormatter.grams(it)} protein / ${ingredient.referenceAmount} ${ingredient.referenceUnit}" }
+                                        ?: "Protein not assigned",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (ingredient.proteinPerReferenceAmount == null) AppColors.Warning else AppColors.Cyan
+                                )
                                 OutlinedTextField(amounts[ingredient.id] ?: "", { amounts[ingredient.id] = it }, label = { Text("Amount") }, enabled = chosen, singleLine = true, modifier = Modifier.fillMaxWidth())
                                 OutlinedTextField(
                                     unitValue,

@@ -11,6 +11,7 @@ import com.sam.caloriestreak.ui.achievements.AchievementsScreen
 import com.sam.caloriestreak.ui.dashboard.DashboardScreen
 import com.sam.caloriestreak.ui.history.HistoryScreen
 import com.sam.caloriestreak.ui.meal_log.LogFoodScreen
+import com.sam.caloriestreak.ui.meal_log.ProteinCorrectionScreen
 import com.sam.caloriestreak.ui.more.MoreScreen
 import com.sam.caloriestreak.ui.recipes.RecipesScreen
 import com.sam.caloriestreak.ui.settings.SettingsScreen
@@ -42,7 +43,7 @@ class DarkThemeVisualSmokeTest {
     }
 
     @Test fun logFoodDarkScreenshotGuard() = assertScreenRemainsDark {
-        LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _ -> })
+        LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _, _ -> })
     }
 
     @Test fun recipesDarkScreenshotGuard() = assertScreenRemainsDark {
@@ -54,7 +55,7 @@ class DarkThemeVisualSmokeTest {
     }
 
     @Test fun statisticsDarkScreenshotGuard() = assertScreenRemainsDark {
-        StatisticsScreen(emptyList(), 14, 31, 1650.0, 2, 4, 7, WeightStats(), 12, 83)
+        StatisticsScreen(emptyList(), emptyList(), 14, 31, 1650.0, 2, 4, 7, WeightStats(), 12, 115)
     }
 
     @Test fun weightDarkScreenshotGuard() = assertScreenRemainsDark {
@@ -65,8 +66,12 @@ class DarkThemeVisualSmokeTest {
         AchievementsScreen(emptyList(), {})
     }
 
+    @Test fun proteinCorrectionsDarkScreenshotGuard() = assertScreenRemainsDark {
+        ProteinCorrectionScreen(emptyList(), {}, { Result.success(Unit) }, { _, _ -> Result.success(Unit) })
+    }
+
     @Test fun moreDarkScreenshotGuard() = assertScreenRemainsDark {
-        MoreScreen(94.2, 12, 83, 2, {}, {}, {}, {})
+        MoreScreen(94.2, 12, 115, 2, {}, {}, {}, {}, {})
     }
 
     @Test fun settingsDarkScreenshotGuard() = assertScreenRemainsDark {

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -36,7 +37,7 @@ fun ScoreRing(
     calorieStatus: String,
     modifier: Modifier = Modifier
 ) {
-    val targetProgress = (score.coerceIn(0.0, 100.0) / 100.0).toFloat()
+    val targetProgress = ScoreRingGeometry.progress(score)
     val progress by animateFloatAsState(
         targetValue = targetProgress,
         animationSpec = tween(AppMotion.Standard),
@@ -60,9 +61,25 @@ fun ScoreRing(
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 20.dp.toPx()
-            drawArc(background, -90f, 360f, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
-            if (progress > 0f) {
-                drawArc(gradient, -90f, 360f * progress, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
+            // Rotate only the drawing coordinate system. This aligns both the visible arc and
+            // the sweep-gradient origin at 12 o'clock without rotating the card or center text.
+            rotate(ScoreRingGeometry.START_ANGLE_DEGREES) {
+                drawArc(
+                    color = background,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                )
+                if (progress > 0f) {
+                    drawArc(
+                        brush = gradient,
+                        startAngle = 0f,
+                        sweepAngle = ScoreRingGeometry.sweepDegrees(progress),
+                        useCenter = false,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    )
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

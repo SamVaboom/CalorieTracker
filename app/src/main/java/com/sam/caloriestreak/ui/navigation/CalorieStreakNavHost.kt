@@ -29,6 +29,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sam.caloriestreak.ui.AppViewModel
 import com.sam.caloriestreak.ui.FeatureViewModel
+import com.sam.caloriestreak.ui.MealProteinCorrectionViewModel
 import com.sam.caloriestreak.ui.achievements.AchievementPopupHost
 import com.sam.caloriestreak.ui.achievements.AchievementsScreen
 import com.sam.caloriestreak.ui.dashboard.DashboardScreen
@@ -36,6 +37,7 @@ import com.sam.caloriestreak.ui.grocery.GroceryScreen
 import com.sam.caloriestreak.ui.history.HistoryScreen
 import com.sam.caloriestreak.ui.ingredients.IngredientsScreen
 import com.sam.caloriestreak.ui.meal_log.LogFoodScreen
+import com.sam.caloriestreak.ui.meal_log.ProteinCorrectionScreen
 import com.sam.caloriestreak.ui.more.MoreScreen
 import com.sam.caloriestreak.ui.recipes.RecipesScreen
 import com.sam.caloriestreak.ui.settings.SettingsScreen
@@ -44,12 +46,13 @@ import com.sam.caloriestreak.ui.weight.WeightScreen
 
 private data class Destination(val route: String, val label: String)
 private val dashboardChildren = setOf("history", "statistics")
-private val moreChildren = setOf("grocery", "weight", "achievements", "settings")
+private val moreChildren = setOf("grocery", "weight", "protein-corrections", "achievements", "settings")
 
 @Composable
 fun CalorieStreakNavHost(
     appViewModel: AppViewModel = viewModel(),
-    featureViewModel: FeatureViewModel = viewModel()
+    featureViewModel: FeatureViewModel = viewModel(),
+    proteinCorrectionViewModel: MealProteinCorrectionViewModel = viewModel()
 ) {
     val navController = rememberNavController()
     val state by appViewModel.state.collectAsStateWithLifecycle()
@@ -119,7 +122,9 @@ fun CalorieStreakNavHost(
                             if (state.freezes == 1) featureViewModel.recordLastFreezeUsed()
                             appViewModel.freezeToday()
                         },
-                        onDeleteMeal = appViewModel::deleteMeal
+                        onDeleteMeal = appViewModel::deleteMeal,
+                        onRecalculateProtein = proteinCorrectionViewModel::recalculateRecipeProtein,
+                        onSetManualProtein = proteinCorrectionViewModel::setManualProtein
                     )
                 }
                 composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual) }
@@ -149,6 +154,7 @@ fun CalorieStreakNavHost(
                         unseenCount = featureState.unseenCount,
                         onGrocery = { navController.navigate("grocery") },
                         onWeight = { navController.navigate("weight") },
+                        onProteinCorrections = { navController.navigate("protein-corrections") },
                         onAchievements = { navController.navigate("achievements") },
                         onSettings = { navController.navigate("settings") }
                     )
@@ -178,6 +184,14 @@ fun CalorieStreakNavHost(
                         onAdd = featureViewModel::addWeight,
                         onUpdate = featureViewModel::updateWeight,
                         onDelete = featureViewModel::deleteWeight
+                    )
+                }
+                composable("protein-corrections") {
+                    ProteinCorrectionScreen(
+                        meals = state.meals,
+                        onDelete = appViewModel::deleteMeal,
+                        onRecalculateRecipeProtein = proteinCorrectionViewModel::recalculateRecipeProtein,
+                        onSetManualProtein = proteinCorrectionViewModel::setManualProtein
                     )
                 }
                 composable("achievements") { AchievementsScreen(featureState.earned, featureViewModel::markAchievementsSeen) }
@@ -210,6 +224,7 @@ fun CalorieStreakNavHost(
                 composable("statistics") {
                     StatisticsScreen(
                         meals = state.meals,
+                        ingredients = state.allIngredients,
                         currentStreak = state.currentStreak,
                         bestStreak = state.bestStreak,
                         targetCalories = state.target,
