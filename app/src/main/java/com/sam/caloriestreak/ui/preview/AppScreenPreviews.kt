@@ -53,7 +53,7 @@ private fun DashboardLargeTextPreview() = DashboardPreview()
 @Preview(name = "Log Food empty", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
 @Composable
 private fun LogFoodPreview() {
-    CalorieStreakTheme { LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _ -> }) }
+    CalorieStreakTheme { LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _, _ -> }) }
 }
 
 @Preview(name = "Recipes empty", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
@@ -80,6 +80,7 @@ private fun StatisticsPreview() {
     CalorieStreakTheme {
         StatisticsScreen(
             meals = emptyList(),
+            ingredients = emptyList(),
             currentStreak = 14,
             bestStreak = 31,
             targetCalories = 1650.0,
@@ -88,7 +89,7 @@ private fun StatisticsPreview() {
             freezeRequiredDays = 7,
             weight = WeightStats(latest = 94.2, first = 96.2, changeFromFirst = -2.0, changeFromPrevious = -0.4, lowest = 94.2, highest = 96.2, averageYear = 95.1, averageAll = 95.1),
             earnedAchievements = 12,
-            totalAchievements = 83
+            totalAchievements = 115
         )
     }
 }
@@ -114,7 +115,7 @@ private fun GroceryPreview() {
 @Preview(name = "More", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
 @Composable
 private fun MorePreview() {
-    CalorieStreakTheme { MoreScreen(94.2, 12, 83, 2, {}, {}, {}, {}) }
+    CalorieStreakTheme { MoreScreen(94.2, 12, 115, 2, {}, {}, {}, {}) }
 }
 
 @Preview(name = "Settings", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true, backgroundColor = DARK_BACKGROUND)
@@ -131,7 +132,7 @@ private fun AchievementPopupPreview() {
             pendingAchievements = listOf(
                 EarnedAchievementEntity(
                     id = "preview",
-                    achievementId = "bullseye",
+                    achievementId = "protein_triple_digits",
                     earnedAt = System.currentTimeMillis(),
                     triggeringEpochDay = null,
                     progressAtUnlock = 100.0
