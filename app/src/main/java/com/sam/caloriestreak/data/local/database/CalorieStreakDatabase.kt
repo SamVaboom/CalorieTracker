@@ -29,7 +29,7 @@ import com.sam.caloriestreak.data.local.entity.WeightEntryEntity
         ActivityEventEntity::class,
         AchievementPopupSummaryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class CalorieStreakDatabase : RoomDatabase() {
