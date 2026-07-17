@@ -42,7 +42,7 @@ class DarkThemeVisualSmokeTest {
     }
 
     @Test fun logFoodDarkScreenshotGuard() = assertScreenRemainsDark {
-        LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _ -> })
+        LogFoodScreen(emptyList(), { _, _, _ -> }, { _, _, _ -> })
     }
 
     @Test fun recipesDarkScreenshotGuard() = assertScreenRemainsDark {
@@ -54,7 +54,7 @@ class DarkThemeVisualSmokeTest {
     }
 
     @Test fun statisticsDarkScreenshotGuard() = assertScreenRemainsDark {
-        StatisticsScreen(emptyList(), 14, 31, 1650.0, 2, 4, 7, WeightStats(), 12, 83)
+        StatisticsScreen(emptyList(), emptyList(), 14, 31, 1650.0, 2, 4, 7, WeightStats(), 12, 115)
     }
 
     @Test fun weightDarkScreenshotGuard() = assertScreenRemainsDark {
@@ -66,7 +66,7 @@ class DarkThemeVisualSmokeTest {
     }
 
     @Test fun moreDarkScreenshotGuard() = assertScreenRemainsDark {
-        MoreScreen(94.2, 12, 83, 2, {}, {}, {}, {})
+        MoreScreen(94.2, 12, 115, 2, {}, {}, {}, {})
     }
 
     @Test fun settingsDarkScreenshotGuard() = assertScreenRemainsDark {
