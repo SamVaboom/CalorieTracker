@@ -1,0 +1,1464 @@
+You are working inside an existing native Android calorie-tracking app repository.
+
+The application already builds and runs on a physical Android phone. The recent dark visual redesign is mostly working, but several UI problems remain and protein tracking now needs to be added.
+
+Do not:
+
+* Create a new project
+* Change frameworks
+* Reset the database
+* Use destructive Room migrations
+* Remove working functionality
+* Change calorie scoring, streak, freeze, weight, grocery, recipe, or achievement logic unless explicitly required below
+* Add the previously discussed random calorie modifier or RNG feature
+
+This update has four main goals:
+
+1. Correct the starting position of the Dashboard score ring.
+2. Make History filters collapsible so they do not dominate the screen.
+3. Make recipe cards expandable to show their ingredients.
+4. Add informational protein tracking and protein-related achievements.
+
+Protein is informational only.
+
+Protein must not affect:
+
+* Daily calorie score
+* Calorie target
+* Streak continuation
+* Freeze progress
+* Freeze earning
+* Cheat days
+* Daily success or failure
+* Accountability events
+
+First inspect the current repository and determine:
+
+* How the circular Dashboard score ring is drawn
+* How its gradient and progress arc are rotated
+* How History filters and charts are currently laid out
+* How recipe cards and recipe ingredients are loaded
+* Current Ingredient, Recipe, RecipeIngredient, MealLog, and DailyLog models
+* Current Room schema and migration version
+* Current manual calorie-entry model
+* Current History list and graph architecture
+* Current Statistics filters and data sources
+* Current achievement engine and registry
+* How achievement reconciliation currently works
+* Existing unit, DAO, migration, and Compose UI tests
+
+Preserve all existing user data.
+
+# 1. Correct the Dashboard progress-ring starting position
+
+The circular Dashboard progress ring currently starts at approximately the 3 o’clock position.
+
+It must start at the 12 o’clock position.
+
+Expected behavior:
+
+* 0% begins at the top of the circle.
+* Progress moves clockwise.
+* 25% reaches approximately 3 o’clock.
+* 50% reaches approximately 6 o’clock.
+* 75% reaches approximately 9 o’clock.
+* 100% completes the circle.
+* The gradient orientation should align naturally with the arc.
+* The score text and calorie text remain unchanged.
+* The existing animation should continue working.
+* The animation must not restart unnecessarily during recomposition.
+
+Inspect whether the current implementation uses:
+
+* `Canvas.drawArc`
+* `startAngle`
+* `Brush.sweepGradient`
+* Canvas rotation
+* Graphics-layer rotation
+* A circular progress-indicator component
+
+For a custom arc, the logical starting angle will normally need to be:
+
+* `-90f`
+
+If the sweep gradient itself starts at the wrong place, rotate or offset the gradient consistently rather than only rotating the visible arc.
+
+Do not rotate the entire card or the center text.
+
+Add tests or screenshot coverage for:
+
+* 0%
+* 25%
+* 50%
+* 75%
+* 100%
+* Correct 12 o’clock start
+* Correct clockwise direction
+
+# 2. Make History filter controls collapsible
+
+The History screen currently places the category, view, metric, and time-range filters inside a large panel above the graph.
+
+On a phone screen, this panel occupies too much vertical space and can push or cover the graph.
+
+Redesign the filter area so it can be collapsed.
+
+## Required behavior
+
+Create a compact filter summary header near the top of the History screen.
+
+Example collapsed summary:
+
+```text
+Calories · Graph · Score % · Last week        [filter icon] [expand arrow]
+```
+
+When collapsed:
+
+* Show the current filter selections in a compact form.
+* Keep the graph or list clearly visible.
+* Use approximately one compact row or small card.
+* Show an expand arrow or filter icon.
+* Do not hide which filters are active.
+
+When expanded:
+
+* Show the full controls for:
+
+  * Category
+  * View
+  * Metric where relevant
+  * Time range
+* Preserve the current selected values.
+* Allow changing all filters.
+* Collapse again through an arrow or explicit action.
+
+Use an animated expansion such as:
+
+* `AnimatedVisibility`
+* `animateContentSize`
+
+Keep the animation short and responsive.
+
+## Default state
+
+When opening History:
+
+* Default the filter panel to collapsed.
+* Preserve the last expanded or collapsed state during the current screen session if practical.
+* Do not permanently store this preference unless the current state architecture makes that useful.
+
+## Relevant filters
+
+For calorie history:
+
+* Category:
+
+  * Calories
+  * Weight
+  * Protein
+* View:
+
+  * List
+  * Graph
+* Metric for Calories:
+
+  * Score %
+  * Calories
+* Time range:
+
+  * Last week
+  * Last month
+  * Last year
+  * All time
+
+For Weight:
+
+* List
+* Graph
+* Last week
+* Last month
+* Last year
+* All time
+
+For Protein:
+
+* List
+* Graph
+* Last week
+* Last month
+* Last year
+* All time
+
+Protein does not need an additional metric selector because its graph displays grams of protein.
+
+## Layout requirements
+
+* The expanded controls must not overlap the chart.
+* The chart must remain below the filter container in normal scrolling layout.
+* Do not place the filter panel as an overlay on top of chart content.
+* Ensure enough bottom padding above the bottom navigation.
+* Keep controls readable in dark mode.
+* Handle narrow screens without clipped filter options.
+* Use horizontally scrollable chips or a dropdown where necessary.
+* The “All time” option must be fully reachable.
+
+Add UI tests for:
+
+* Panel starts collapsed.
+* Expand action reveals all controls.
+* Collapse action hides detailed controls.
+* Selected values remain visible in summary form.
+* Changing a filter updates the graph.
+* Expanded controls do not overlap the graph.
+* State survives normal recomposition.
+
+# 3. Expandable recipe cards
+
+On the Recipes screen, recipe cards currently show summary information only.
+
+Make each recipe card expandable by tapping the main card area.
+
+## Collapsed recipe card
+
+Keep the existing information:
+
+* Recipe name
+* Optional description
+* Calories per serving
+* Ingredient count
+* Number of servings
+* Total recipe calories
+* Edit action
+* Favorite state if currently shown
+
+Add a visible expand indicator such as:
+
+* Downward chevron when collapsed
+* Upward chevron when expanded
+
+The edit icon must continue opening recipe editing rather than expanding the card.
+
+## Expanded recipe card
+
+When expanded, display the recipe’s ingredient list beneath the summary.
+
+For each ingredient show:
+
+* Ingredient name
+* Quantity
+* Unit
+* Ingredient calories for the recipe quantity
+* Ingredient protein for the recipe quantity, when known
+* A clear “Protein not assigned” indicator when protein is missing
+
+Example:
+
+```text
+Eggplant                         3 pieces
+180 kcal · Protein not assigned
+
+Mozzarella                         300 g
+840 kcal · 66.0 g protein
+
+Tomato sauce                       200 g
+90 kcal · 2.4 g protein
+```
+
+At the bottom of the expanded area show:
+
+* Total recipe calories
+* Calories per serving
+* Total recipe protein when fully or partially known
+* Protein per serving when fully calculable
+* A warning if one or more ingredients have missing protein data
+
+## Expansion behavior
+
+* Tap the card body to expand or collapse.
+* Tapping Edit must not toggle expansion.
+* Use a short height animation.
+* Expansion state should be stored using stable recipe IDs.
+* Scrolling and recomposition must not randomly collapse cards.
+* Multiple recipes may be expanded simultaneously unless the existing architecture strongly favors one at a time.
+* Expansion must remain performant with many recipes.
+* Avoid fetching every ingredient relation repeatedly during recomposition.
+
+Use Room relations, repository flows, or preloaded recipe-detail UI state efficiently.
+
+Add tests for:
+
+* Card initially collapsed.
+* Tap expands it.
+* Second tap collapses it.
+* Ingredient rows display correctly.
+* Edit action remains separate.
+* Missing-protein warning displays.
+* Expansion state uses stable recipe ID.
+* Search filtering does not attach expansion state to the wrong card.
+
+# 4. Add protein to ingredients
+
+Add optional protein information to every ingredient.
+
+Remove the Brand field from ingredient creation and editing.
+
+Replace it with Protein.
+
+## Ingredient fields
+
+The Ingredient model should contain at least:
+
+* ID
+* Name
+* Calories
+* Calorie reference quantity
+* Reference unit
+* Protein grams for the same reference quantity
+* Category if currently supported
+* Favorite
+* Archived
+* Created timestamp
+* Updated timestamp
+
+Remove Brand from normal ingredient forms and displays.
+
+If Brand already exists in the database:
+
+* Do not perform a destructive migration.
+* The old database column may remain unused if removing it safely would create unnecessary migration complexity.
+* Stop displaying and editing Brand.
+* Do not move Brand text into Protein.
+* Do not lose any unrelated ingredient data.
+
+## Protein input
+
+Protein must use the same reference amount and unit as calories.
+
+Examples:
+
+```text
+Mozzarella
+280 kcal per 100 g
+22.0 g protein per 100 g
+```
+
+```text
+Banana
+105 kcal per 1 piece
+1.3 g protein per 1 piece
+```
+
+Ingredient form fields should be:
+
+* Name
+* Calories
+* Reference quantity
+* Unit
+* Protein
+* Other existing relevant fields
+
+Protein requirements:
+
+* Protein is optional.
+* Store it as a nullable Double.
+* Null means “protein not assigned.”
+* Zero means explicitly assigned as 0 g.
+* Do not treat missing protein as zero.
+* Allow decimal values.
+* Reject negative values.
+* Use grams as the protein unit.
+* Display one decimal place where practical.
+
+Examples:
+
+* `22.0 g protein / 100 g`
+* `1.3 g protein / piece`
+* `Protein not assigned`
+
+# 5. Flag ingredients with missing protein
+
+Every active ingredient that has no protein value assigned must be visibly flagged.
+
+Display the warning in:
+
+* Ingredient list
+* Ingredient details
+* Ingredient editing
+* Recipe ingredient picker
+* Expanded recipe cards
+* Recipe creation and editing where relevant
+
+Suggested visual treatment:
+
+* Small amber warning icon
+* Label:
+
+  * “Protein missing”
+  * “Protein not assigned”
+
+Do not use an aggressive error-red style because missing protein does not prevent calorie tracking.
+
+## Ingredient filtering
+
+Add a useful filter on the Ingredients screen:
+
+* All
+* Protein missing
+* Protein assigned
+
+Keep the existing search function.
+
+Search and filtering must work together.
+
+Example:
+
+* Search: `cheese`
+* Filter: Protein missing
+* Result: only matching cheese ingredients without protein values
+
+## Existing ingredients
+
+After migration:
+
+* Existing ingredients should have protein set to null.
+* They should therefore display the missing-protein flag.
+* The app must not invent protein values.
+* The user will add protein manually over time.
+
+# 6. Protein calculations
+
+Create a pure Kotlin protein calculation function separate from Compose UI.
+
+Use the same proportional logic as ingredient calories.
+
+Formula:
+
+```text
+protein used =
+protein per reference quantity
+× quantity used
+÷ reference quantity
+```
+
+Example:
+
+```text
+22 g protein per 100 g
+300 g used
+
+22 × 300 ÷ 100 = 66 g protein
+```
+
+For count-based ingredients:
+
+```text
+protein used =
+protein per unit × number of units
+```
+
+## Missing values
+
+If an ingredient has no assigned protein:
+
+* Its protein amount is unknown.
+* Do not automatically count it as 0 g.
+* Mark the containing recipe as having incomplete protein data.
+
+A recipe should expose:
+
+* Known protein total
+* Whether protein data is complete
+* Number of ingredients missing protein
+
+Example:
+
+```text
+Known protein: 68.4 g
+Protein data incomplete: 1 ingredient missing
+```
+
+If all ingredients have assigned protein:
+
+```text
+Total protein: 72.1 g
+Protein per serving: 36.1 g
+```
+
+# 7. Protein snapshots in meal logs
+
+When logging a recipe, store protein information as a historical snapshot just as calories are stored.
+
+Add fields where appropriate:
+
+* Protein grams snapshot
+* Protein-data-complete flag
+* Number of missing-protein ingredients, if useful
+
+Required behavior:
+
+* Editing an ingredient’s protein later must not silently alter already logged meals.
+* Editing a recipe later must not alter historical meal protein.
+* New meal logs use the current recipe protein calculation.
+* Historical meal logs retain their original protein snapshot.
+* Existing meal logs created before this update have unknown protein unless reliable reconstruction is intentionally performed.
+
+Preferred migration behavior for old meal logs:
+
+* Protein snapshot = null
+* Protein complete = false or unknown
+* Do not invent a zero value
+
+## Manual calorie entries
+
+Add an optional Protein field to manual calorie logging.
+
+Example:
+
+```text
+Restaurant meal
+850 kcal
+Protein: 35 g
+```
+
+Requirements:
+
+* Protein remains optional.
+* Null means unknown.
+* Zero means explicitly 0 g.
+* Historical manual entries remain unknown after migration.
+* Manual entries with protein contribute to protein totals.
+
+# 8. Daily protein totals
+
+Calculate daily protein from meal-log snapshots.
+
+Daily protein should expose:
+
+* Known protein grams
+* Whether all logs have complete protein data
+* Number of entries with missing protein
+
+Example:
+
+```text
+Protein: 94.2 g
+2 logged items have unknown protein
+```
+
+Do not prevent display of the known total merely because some items are incomplete.
+
+Do not describe an incomplete total as an exact complete daily total.
+
+Suitable wording:
+
+* `At least 94.2 g`
+* `94.2 g known protein`
+* `Protein data incomplete`
+
+If every meal has valid protein:
+
+* `94.2 g protein`
+
+# 9. Protein in History
+
+Add Protein as a History category alongside Calories and Weight.
+
+## Protein list view
+
+Group entries by date.
+
+Each day should show:
+
+* Date
+* Known protein total
+* Complete or incomplete-data status
+* Meals and their protein values
+* Entries with unknown protein clearly marked
+
+Example:
+
+```text
+15 July 2026
+94.2 g known protein
+1 entry missing protein data
+```
+
+Individual meals:
+
+```text
+Aubergine Pizza       38.4 g
+Restaurant meal       Protein unknown
+```
+
+## Protein graph view
+
+Provide time ranges:
+
+* Last week
+* Last month
+* Last year
+* All time
+
+Graph requirements:
+
+* Y-axis uses grams of protein.
+* Plot known daily protein totals.
+* Do not display missing days as zero unless the date genuinely has logged food with an explicit 0 g protein total.
+* Distinguish incomplete days visually where practical.
+* A point tooltip should display:
+
+  * Date
+  * Known protein grams
+  * Whether data is complete
+* Use a distinct protein color such as teal, green, or cyan.
+* Keep the graph readable in dark mode.
+* There is no protein target or protein-goal line.
+* There is no streak threshold line.
+* Protein does not affect calorie graphs.
+
+## Default Protein history state
+
+When switching to Protein:
+
+* Preserve the current List/Graph selection when practical.
+* Use Last week as the default time range if no Protein-specific range state exists.
+
+# 10. Protein in Statistics
+
+Add a Protein section and Protein filter to Statistics.
+
+Statistics filters should include:
+
+* All
+* Calories
+* Streaks and Freezes
+* Weight
+* Protein
+* Achievements
+
+All remains the default.
+
+## Protein statistics
+
+Display at least:
+
+* Protein today
+* Known protein during the last 7 days
+* Average protein per recorded day during the last 7 days
+* Known protein during the last 30 days
+* Average protein per recorded day during the last 30 days
+* Known protein during the last year
+* Average protein per recorded day during the last year
+* All-time known protein
+* All-time average per recorded day
+* Highest known protein in one day
+* Highest protein in one meal
+* Number of days with at least 100 g protein
+* Number of active ingredients with protein assigned
+* Number of active ingredients missing protein
+* Percentage of active ingredients with protein assigned
+
+Important:
+
+* Average only dates with recorded calorie entries unless clearly labelled otherwise.
+* Do not create zero-protein values for missing dates.
+* Clearly mark statistics as known protein when historical data is incomplete.
+* Do not show a target, goal-completion percentage, success color, or failure state.
+* Protein is descriptive information only.
+
+# 11. Protein achievements
+
+Add the following protein achievements.
+
+Protein achievements provide no effect on:
+
+* Streak
+* Freeze progress
+* Calorie score
+* Cheat days
+* Calorie target
+
+Use stored meal protein snapshots.
+
+Deleted meal logs must no longer contribute after achievement reconciliation where the achievement is meant to reflect valid historical data.
+
+Permanent lifetime achievements may remain earned once legitimately achieved unless the existing achievement architecture requires evidence-based reconciliation.
+
+Use stable achievement IDs.
+
+Avoid duplicates if equivalent achievements already exist.
+
+# 11.1 Daily protein achievements
+
+## Protein Initiate
+
+Condition:
+
+* Record at least 50 g of known protein in one calendar day
+
+Comment:
+
+“Every journey starts with a first serving.”
+
+## Solid Foundation
+
+Condition:
+
+* Record at least 75 g of known protein in one calendar day
+
+## Triple Digits
+
+Condition:
+
+* Record at least 100 g of known protein in one calendar day
+
+Comment:
+
+“Welcome to triple digits.”
+
+## Heavy Lifter
+
+Condition:
+
+* Record at least 125 g of known protein in one calendar day
+
+## The 150 Club
+
+Condition:
+
+* Record at least 150 g of known protein in one calendar day
+
+## Absolute Unit
+
+Condition:
+
+* Record at least 200 g of known protein in one calendar day
+
+This may be hidden until unlocked.
+
+## Incomplete protein days
+
+A day can qualify when its known protein amount alone reaches the threshold, even if some other meals have unknown protein.
+
+Example:
+
+* Known protein = 105 g
+* One meal has unknown protein
+* Triple Digits qualifies because the actual value cannot be lower than 105 g.
+
+Do not qualify a day whose known amount is below the threshold merely by assuming missing values.
+
+# 11.2 Single-meal protein achievements
+
+## Protein Snack
+
+Condition:
+
+* Log one meal containing at least 20 g of protein
+
+## Power Meal
+
+Condition:
+
+* Log one meal containing at least 30 g of protein
+
+## Main Course
+
+Condition:
+
+* Log one meal containing at least 50 g of protein
+
+## Protein Bomb
+
+Condition:
+
+* Log one meal containing at least 75 g of protein
+
+The meal must have a known protein snapshot.
+
+# 11.3 Cumulative protein achievements
+
+## Kilo Club
+
+Condition:
+
+* Record a cumulative total of at least 1,000 g of known protein
+
+Comment:
+
+“One kilogram of protein logged.”
+
+## Five-Kilo Sack
+
+Condition:
+
+* Record at least 5,000 g total
+
+## Ten-Kilo Plate
+
+Condition:
+
+* Record at least 10,000 g total
+
+## Protein Warehouse
+
+Condition:
+
+* Record at least 25,000 g total
+
+## Industrial Quantities
+
+Condition:
+
+* Record at least 50,000 g total
+
+## Protein Empire
+
+Condition:
+
+* Record at least 100,000 g total
+
+Cumulative achievements use known stored protein only.
+
+Unknown protein contributes nothing until valid protein exists in a newly logged or explicitly corrected meal entry.
+
+# 11.4 Body-weight protein achievements
+
+These require a valid weight entry.
+
+For daily body-weight comparisons, use the most recent valid weight recorded on or before the protein day.
+
+Do not use a future weight entry to evaluate an earlier day.
+
+## Pound for Pound
+
+Condition:
+
+* Record at least 1 g of protein per kilogram of body weight in one day
+
+Example:
+
+* Applicable weight: 92 kg
+* Required daily protein: 92 g
+
+## Double Density
+
+Condition:
+
+* Record at least 2 g of protein per kilogram of body weight in one day
+
+Example:
+
+* Applicable weight: 92 kg
+* Required daily protein: 184 g
+
+## Half of Yourself
+
+Condition:
+
+* Record a cumulative known protein total equal to at least half of the first valid recorded body weight
+
+Example:
+
+* First recorded weight: 96 kg
+* Required cumulative protein:
+
+  * 48 kg
+  * 48,000 g
+
+Use the first valid chronological weight entry as a stable threshold.
+
+## Eat Yourself
+
+Condition:
+
+* Record a cumulative known protein total equal to the first valid recorded body weight
+
+Example:
+
+* First recorded weight: 96 kg
+* Required cumulative protein:
+
+  * 96 kg
+  * 96,000 g
+
+If the first weight entry is edited or deleted, reconcile these achievements using the new earliest valid weight.
+
+# 11.5 Protein consistency achievements
+
+These achievements do not require a configured protein goal.
+
+## Three Protein Days
+
+Condition:
+
+* Record at least 100 g of known protein on three different calendar days
+
+The days do not need to be consecutive.
+
+## Protein Week
+
+Condition:
+
+* Record at least 100 g on seven different calendar days
+
+The days do not need to be consecutive.
+
+## Protein Routine
+
+Condition:
+
+* Record at least 100 g on 20 different days within a rolling 30-day period
+
+## Triple-Digit Streak
+
+Condition:
+
+* Record at least 100 g for seven consecutive recorded calendar days
+
+A date below 100 g breaks this achievement sequence.
+
+A date with incomplete protein may qualify when its known total is already at least 100 g.
+
+# 11.6 Protein-data achievements
+
+## Protein Detective
+
+Condition:
+
+* Have protein information assigned to 25 active ingredients
+
+## Protein Librarian
+
+Condition:
+
+* Have protein information assigned to 100 active ingredients
+
+## No Mystery Macros
+
+Condition:
+
+* Every active ingredient has protein assigned
+* At least 25 active ingredients exist
+
+This should be dynamic.
+
+If a new active ingredient without protein is added, the achievement becomes locked again.
+
+It can unlock again once all active ingredients have protein values.
+
+## Fully Calculated
+
+Condition:
+
+* Finish one recorded day where every logged meal has complete protein information
+
+Requirements:
+
+* Day contains at least one logged meal
+* No meal has unknown protein
+* Do not unlock on an empty day
+
+## Complete Week
+
+Condition:
+
+* Record seven consecutive days where every logged meal has complete protein information
+
+Each day must:
+
+* Contain at least one meal
+* Have no unknown protein entries
+
+# 11.7 Protein recipe achievements
+
+## Protein Chef
+
+Condition:
+
+* Create 10 active recipes containing at least 20 g of fully calculable protein per serving
+
+## High-Protein Menu
+
+Condition:
+
+* Create 10 active recipes containing at least 30 g of fully calculable protein per serving
+
+## Protein Explorer
+
+Condition:
+
+* Log 10 different saved recipes that each contain at least 20 g of protein per logged serving
+
+Match by stable recipe ID.
+
+A recipe with incomplete protein data does not qualify until its protein becomes fully calculable for future logs.
+
+# 12. Achievement behavior
+
+Protein achievements should use the existing achievement-popup system.
+
+When unlocked:
+
+* Show the centered achievement overlay during app use.
+* If earned while the app is closed, show it on the next app launch.
+* Queue multiple unlocks.
+* Do not duplicate popup displays.
+* Large retroactive batches should use one summary popup.
+
+## Permanent versus dynamic
+
+Permanent examples:
+
+* Triple Digits
+* Kilo Club
+* Protein Bomb
+* Eat Yourself
+* Protein Week
+
+Dynamic example:
+
+* No Mystery Macros
+
+For permanent achievements:
+
+* Once legitimately earned from valid records, retain the unlock unless the current architecture explicitly performs complete evidence-based deletion reconciliation.
+
+For dynamic achievements:
+
+* Reflect current database state.
+* Relock when the condition is no longer true.
+* Show a new popup only on a genuine locked-to-earned transition.
+
+# 13. Historical migration and backfill
+
+Existing ingredients:
+
+* Protein = null
+* Flag as Protein missing
+
+Existing recipes:
+
+* Protein is incomplete until ingredient values are assigned
+
+Existing meal logs:
+
+* Do not silently recompute protein from newly edited ingredients.
+* Historical protein snapshot remains unknown unless the user explicitly edits and resaves the meal using a supported correction flow.
+* Calories remain unchanged.
+
+Existing daily logs:
+
+* Protein known total may initially be null or 0 known grams with incomplete status.
+* Do not present old unknown values as true zero-protein days.
+
+Existing achievements:
+
+* Preserve all unrelated achievement records.
+* Evaluate protein achievements only from valid protein snapshot data.
+* Do not award protein achievements based solely on current recipe definitions applied retroactively to old meals.
+
+Use a proper Room migration.
+
+Do not use destructive migration fallback.
+
+# 14. Protein correction for existing meals
+
+Provide an optional and explicit way to correct historical protein without changing calories.
+
+When editing an existing meal log:
+
+* Show current stored calorie snapshot.
+* Show current stored protein snapshot.
+* Allow the user to update protein through:
+
+  * Recalculating from the current recipe definition, with explicit confirmation
+  * Manually entering protein for a manual meal
+* Explain that the historical protein value will be updated.
+* Do not automatically alter it when opening the edit screen.
+* Preserve original calories unless the user separately edits the meal calories.
+
+This feature may be implemented after core protein tracking if necessary, but the data architecture must support it.
+
+# 15. Formatting
+
+Create a centralized protein formatter.
+
+Examples:
+
+* `0.0 g`
+* `22.4 g`
+* `100 g` may display as `100.0 g` or `100 g`, but choose one consistent style
+* Cumulative totals:
+
+  * Below 1,000 g: grams
+  * 1,000 g and above: optionally display kilograms with a grams detail
+
+Suggested:
+
+* Daily and meal values: one decimal place in grams
+* Lifetime values:
+
+  * `1.0 kg`
+  * `25.4 kg`
+
+Do not display raw format templates such as:
+
+* `%.1f g`
+
+Use locale-safe formatting.
+
+# 16. Protein UI design
+
+Keep the current dark design system.
+
+Use a distinct protein accent such as:
+
+* Teal
+* Cyan
+* Fresh green
+
+Do not make every protein element bright green.
+
+Protein UI should appear in:
+
+* Ingredient rows
+* Expanded recipe cards
+* History
+* Statistics
+* Achievement cards
+* Forms
+
+Do not add protein to the main Dashboard hero.
+
+Do not add:
+
+* Protein progress toward a goal
+* Protein success status
+* Protein warning on Dashboard
+* Protein-based streak indication
+
+# 17. Database and architecture
+
+Add or update fields and tables as needed.
+
+Possible fields:
+
+## Ingredient
+
+* `proteinPerReferenceAmount: Double?`
+
+## MealLog
+
+* `proteinGramsSnapshot: Double?`
+* `proteinDataComplete: Boolean`
+* `missingProteinItemCount: Int`
+
+## DailyLog, if cached
+
+* `knownProteinGrams: Double?`
+* `proteinDataComplete: Boolean`
+* `missingProteinEntryCount: Int`
+
+Prefer deriving daily protein from meal logs unless caching is already part of the architecture.
+
+If cached, ensure add/edit/delete operations keep it consistent.
+
+Use pure Kotlin calculators:
+
+* IngredientProteinCalculator
+* RecipeProteinCalculator
+* DailyProteinCalculator
+
+Keep business logic outside Compose.
+
+# 18. Tests
+
+Add or update tests.
+
+## Score ring tests
+
+* Starts at 12 o’clock
+* Moves clockwise
+* Correct visual state at 25%, 50%, 75%, and 100%
+* Gradient orientation matches the arc
+
+## History filter tests
+
+* Collapsed by default
+* Expanded controls display
+* Summary displays selected filters
+* Collapse retains selections
+* Graph remains unobstructed
+* Protein category available
+
+## Recipe expansion tests
+
+* Expand
+* Collapse
+* Ingredients displayed
+* Calories displayed
+* Protein displayed
+* Missing protein warning
+* Edit action remains independent
+* Stable state during scrolling and search
+
+## Ingredient protein tests
+
+* Add protein
+* Edit protein
+* Clear protein to unknown
+* Zero protein remains explicit zero
+* Negative protein rejected
+* Existing ingredients migrate to null
+* Missing filter
+* Assigned filter
+
+## Protein calculation tests
+
+* Grams
+* Millilitres
+* Piece-based ingredient
+* Fractional quantities
+* Multiple recipe ingredients
+* Protein per serving
+* Missing ingredient protein
+* Partially known recipe total
+* Fully complete recipe total
+
+## Meal snapshot tests
+
+* New meal stores protein snapshot
+* Recipe edit does not change old meal protein
+* Ingredient edit does not change old meal protein
+* New meal uses updated protein
+* Manual entry protein
+* Unknown manual protein
+* Meal deletion updates daily protein
+
+## Protein history tests
+
+* List values
+* Incomplete-data label
+* Last-week graph
+* Last-month graph
+* Last-year graph
+* All-time graph
+* Missing dates not treated as zero
+* Tooltip completeness state
+
+## Protein statistics tests
+
+* Today
+* Seven-day total and average
+* Thirty-day total and average
+* Past-year total and average
+* All-time total
+* Highest day
+* Highest meal
+* 100 g day count
+* Ingredient completion percentage
+* Missing data handled correctly
+
+## Protein achievement tests
+
+Test every threshold:
+
+* 50 g
+* 75 g
+* 100 g
+* 125 g
+* 150 g
+* 200 g
+* 20 g meal
+* 30 g meal
+* 50 g meal
+* 75 g meal
+* 1,000 g total
+* 5,000 g total
+* 10,000 g total
+* 25,000 g total
+* 50,000 g total
+* 100,000 g total
+* 1 g/kg body weight
+* 2 g/kg body weight
+* Half of first weight
+* Full first weight
+* Three 100 g days
+* Seven 100 g days
+* 20 of 30 days
+* Seven-day consecutive streak
+* Protein Detective
+* Protein Librarian
+* No Mystery Macros
+* Fully Calculated
+* Complete Week
+* Protein Chef
+* High-Protein Menu
+* Protein Explorer
+
+Also test:
+
+* Missing protein does not get assumed.
+* Known amount can still qualify when already above threshold.
+* Deleted meals update rolling and cumulative calculations where required.
+* Achievement unlock is not duplicated.
+* Dynamic No Mystery Macros relocks.
+* Weight lookup uses the latest weight on or before the protein date.
+* Future weight is not used for earlier protein day.
+* First-weight edit recalculates body-weight cumulative thresholds.
+
+## Migration tests
+
+Verify:
+
+* Existing ingredients remain
+* Existing recipes remain
+* Existing meals remain
+* Existing calories remain
+* Existing achievements remain
+* New protein values begin unknown
+* No destructive reset occurs
+
+# 19. Implementation order
+
+Implement incrementally.
+
+## Phase 1: Audit and UI corrections
+
+* Build current app
+* Run current tests
+* Fix ring start angle
+* Make History filters collapsible
+* Add expandable recipe cards
+* Add UI tests and screenshot coverage
+
+## Phase 2: Protein data model
+
+* Add optional ingredient protein
+* Remove Brand from forms
+* Add Room migration
+* Add missing-protein flags and filters
+* Add protein calculation classes
+
+## Phase 3: Recipe and meal protein
+
+* Add recipe protein calculations
+* Add expanded recipe protein display
+* Add meal protein snapshots
+* Add optional manual-entry protein
+* Add daily protein calculations
+
+## Phase 4: Protein History
+
+* Add Protein category
+* Add list
+* Add graph
+* Add time ranges
+* Add incomplete-data treatment
+
+## Phase 5: Protein Statistics
+
+* Add Protein filter
+* Add Protein section to All
+* Add totals, averages, highs, and data-completion statistics
+
+## Phase 6: Protein achievements
+
+* Add definitions
+* Add evaluator logic
+* Add dynamic No Mystery Macros
+* Integrate popup queue
+* Add tests
+
+## Phase 7: Reconciliation and final verification
+
+* Reconcile valid protein records
+* Avoid fake retroactive values
+* Verify migration
+* Run all tests
+* Build debug APK
+* Test on emulator
+* Test on physical phone
+* Update README
+
+# 20. Git commits
+
+Use small commits such as:
+
+* Correct Dashboard progress-ring origin
+* Add collapsible History filters
+* Add expandable recipe ingredient cards
+* Add optional ingredient protein data
+* Add protein calculations and missing-data flags
+* Store meal protein snapshots
+* Add Protein History list and graph
+* Add Protein Statistics
+* Add daily and cumulative protein achievements
+* Add body-weight and protein-data achievements
+* Add Room migration and protein regression tests
+
+Do not commit:
+
+* Build output
+* APK files unless intentionally tracked
+* Signing keys
+* Secrets
+* Personal machine paths
+* Local Android Studio files
+
+# 21. Definition of done
+
+This update is complete when:
+
+1. The Dashboard score ring begins at 12 o’clock.
+2. The ring fills clockwise.
+3. History filters are collapsed by default.
+4. Expanded filters do not cover the graph.
+5. Current filters remain visible in compact summary form.
+6. Recipe cards expand when tapped.
+7. Expanded recipes show all ingredients.
+8. Recipe ingredient calories are visible.
+9. Recipe ingredient protein is visible when assigned.
+10. Missing recipe protein is clearly flagged.
+11. Brand is removed from ingredient forms.
+12. Protein can be assigned per ingredient reference quantity.
+13. Existing ingredients are marked as missing protein.
+14. Protein is optional and null is distinct from zero.
+15. New meal logs store protein snapshots.
+16. Historical protein does not change when recipes are edited.
+17. Manual entries can optionally include protein.
+18. Protein appears as a History category.
+19. Protein History supports List and Graph.
+20. Protein graph supports Last week, Last month, Last year, and All time.
+21. Protein appears in Statistics and the All filter.
+22. Protein does not affect calories, score, streaks, or freezes.
+23. All specified protein achievements exist.
+24. Body-weight protein achievements use valid weight data.
+25. Protein achievement popups use the existing popup system.
+26. Existing app data survives migration.
+27. All tests pass.
+28. The app builds and runs on the physical Android phone.
+29. No RNG or random calorie modifier is implemented.
+
+# First action
+
+Before changing implementation:
+
+1. Inspect the current repository.
+2. Build the app.
+3. Run existing tests.
+4. Produce a concise audit of:
+
+   * Score-ring drawing
+   * History filter layout
+   * Recipe-card data loading
+   * Ingredient schema
+   * Meal snapshots
+   * History and Statistics architecture
+   * Achievement engine
+5. Identify required Room migrations.
+6. Explain how unknown protein will remain distinct from explicit zero protein.
+7. List the exact files to create or modify.
+8. Then begin with the three UI corrections before implementing protein.
