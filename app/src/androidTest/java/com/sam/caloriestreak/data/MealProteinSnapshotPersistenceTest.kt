@@ -11,22 +11,24 @@ import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
 import com.sam.caloriestreak.domain.protein.DailyProteinCalculator
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TestName
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MealProteinSnapshotPersistenceTest {
-    @get:Rule val testName = TestName()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var database: CalorieStreakDatabase
 
     @Before fun setUp() {
         database = Room.inMemoryDatabaseBuilder(context, CalorieStreakDatabase::class.java).build()
+    }
+
+    @After fun tearDown() {
+        database.close()
     }
 
     private fun meal(id: String, protein: Double?, complete: Boolean) = MealLogEntity(
@@ -74,7 +76,10 @@ class MealProteinSnapshotPersistenceTest {
         assertEquals(500.0, historical.calories, 0.0001)
 
         database.appDao().upsertMeal(meal("recipe-new", 50.0, true))
-        assertEquals(listOf(33.0, 50.0), database.appDao().allMeals().mapNotNull { it.proteinGramsSnapshot })
+        assertEquals(
+            listOf(33.0, 50.0),
+            database.appDao().allMeals().mapNotNull { it.proteinGramsSnapshot }.sorted()
+        )
     }
 
     @Test fun manualUnknownAndExplicitZeroRemainDistinct() = runBlocking {
