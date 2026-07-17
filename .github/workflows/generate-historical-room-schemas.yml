@@ -1,11 +1,10 @@
 name: Generate historical Room schemas
 
 on:
-  push:
-    branches: [codex/protein-ci-room-fix]
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   schemas:
@@ -20,23 +19,17 @@ jobs:
           java-version: '17'
       - name: Ensure wrapper is executable
         run: chmod +x gradlew
-      - name: Generate missing historical schemas from their real source revisions
+      - name: Generate historical schemas from their real source revisions
         shell: bash
         run: |
           set -euo pipefail
-          schema_dir='app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase'
-          mkdir -p "$schema_dir"
+          output_dir="$RUNNER_TEMP/historical-room-schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase"
+          mkdir -p "$output_dir"
 
           generate_schema() {
             version="$1"
             ref="$2"
-            target="$schema_dir/$version.json"
-            if [[ -s "$target" ]]; then
-              echo "Schema $version already exists"
-              return
-            fi
-
-            worktree="/tmp/calorie-schema-$version"
+            worktree="$RUNNER_TEMP/calorie-schema-$version"
             rm -rf "$worktree"
             git worktree add --detach "$worktree" "$ref"
 
@@ -73,7 +66,7 @@ jobs:
             generated="$worktree/app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase/$version.json"
             test -s "$generated"
             python3 -m json.tool "$generated" >/dev/null
-            cp "$generated" "$target"
+            cp "$generated" "$output_dir/$version.json"
             git worktree remove --force "$worktree"
           }
 
@@ -82,20 +75,14 @@ jobs:
           generate_schema 3 c78ef0f4540de0cced7a9427df84de458e124487
           generate_schema 4 1dad7fcb8c83a7f58ae91992ca7c9ad54b1b7dd3
 
-          for schema in "$schema_dir"/*.json; do
+          for schema in "$output_dir"/*.json; do
             test -s "$schema"
             python3 -m json.tool "$schema" >/dev/null
           done
-      - name: Commit historical schema files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/schemas
-          if git diff --cached --quiet; then
-            echo 'Historical schemas already committed.'
-            exit 0
-          fi
-          git commit -m 'Commit generated Room schema history'
-          git push
+      - name: Upload generated historical schemas
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-room-schemas
+          path: ${{ runner.temp }}/historical-room-schemas
+          if-no-files-found: error
+          retention-days: 3
