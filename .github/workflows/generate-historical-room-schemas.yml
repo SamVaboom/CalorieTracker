@@ -1,0 +1,101 @@
+name: Generate historical Room schemas
+
+on:
+  push:
+    branches: [codex/protein-ci-room-fix]
+
+permissions:
+  contents: write
+
+jobs:
+  schemas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Ensure wrapper is executable
+        run: chmod +x gradlew
+      - name: Generate missing historical schemas from their real source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema_dir='app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase'
+          mkdir -p "$schema_dir"
+
+          generate_schema() {
+            version="$1"
+            ref="$2"
+            target="$schema_dir/$version.json"
+            if [[ -s "$target" ]]; then
+              echo "Schema $version already exists"
+              return
+            fi
+
+            worktree="/tmp/calorie-schema-$version"
+            rm -rf "$worktree"
+            git worktree add --detach "$worktree" "$ref"
+
+            WORKTREE="$worktree" python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path(os.environ['WORKTREE'])
+          root_build = root / 'build.gradle.kts'
+          app_build = root / 'app' / 'build.gradle.kts'
+
+          text = root_build.read_text(encoding='utf-8')
+          if 'id("androidx.room")' not in text:
+              close = text.find('}', text.find('plugins {'))
+              text = text[:close] + '    id("androidx.room") version "2.6.1" apply false\n' + text[close:]
+              root_build.write_text(text, encoding='utf-8')
+
+          text = app_build.read_text(encoding='utf-8')
+          if 'id("androidx.room")' not in text:
+              close = text.find('}', text.find('plugins {'))
+              text = text[:close] + '    id("androidx.room")\n' + text[close:]
+          text = re.sub(r'\nksp\s*\{.*?\}\s*\n', '\n', text, flags=re.S)
+          if 'room {' not in text:
+              text = text.replace(
+                  '\ndependencies {',
+                  '\nroom {\n    schemaDirectory("$projectDir/schemas")\n}\n\ndependencies {',
+                  1,
+              )
+          app_build.write_text(text, encoding='utf-8')
+          PY
+
+            ./gradlew -p "$worktree" --no-daemon clean kspDebugKotlin --stacktrace --console=plain
+            generated="$worktree/app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase/$version.json"
+            test -s "$generated"
+            python3 -m json.tool "$generated" >/dev/null
+            cp "$generated" "$target"
+            git worktree remove --force "$worktree"
+          }
+
+          generate_schema 1 f7f912174409668970a0a30a9aa9d23df2d6105e
+          generate_schema 2 f1af1bf6d7a4f39e79d57d7703ac1790dd86dc38
+          generate_schema 3 c78ef0f4540de0cced7a9427df84de458e124487
+          generate_schema 4 1dad7fcb8c83a7f58ae91992ca7c9ad54b1b7dd3
+
+          for schema in "$schema_dir"/*.json; do
+            test -s "$schema"
+            python3 -m json.tool "$schema" >/dev/null
+          done
+      - name: Commit historical schema files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/schemas
+          if git diff --cached --quiet; then
+            echo 'Historical schemas already committed.'
+            exit 0
+          fi
+          git commit -m 'Commit generated Room schema history'
+          git push
