@@ -7,10 +7,13 @@ import androidx.room.PrimaryKey
 data class IngredientEntity(
     @PrimaryKey val id: String,
     val name: String,
+    /** Retained for non-destructive compatibility with existing databases; no longer edited or displayed. */
     val brand: String? = null,
     val calories: Double,
     val referenceAmount: Double,
     val referenceUnit: String,
+    /** Grams of protein for the same referenceAmount/referenceUnit. Null means not assigned. */
+    val proteinPerReferenceAmount: Double? = null,
     val category: String? = null,
     val favorite: Boolean = false,
     val archived: Boolean = false,
