@@ -14,25 +14,64 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
+      - name: Validate committed Room schema files
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema_dir='app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase'
+          test -d "$schema_dir"
+          if find app/schemas -type f -name '*.json' -empty | grep -q .; then
+            echo 'Empty Room schema file detected:'
+            find app/schemas -type f -name '*.json' -empty
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          schema_dir = Path('app/schemas/com.sam.caloriestreak.data.local.database.CalorieStreakDatabase')
+          files = sorted(schema_dir.glob('*.json'))
+          if not files:
+              raise SystemExit('No committed Room schema files found')
+          versions = []
+          for path in files:
+              if path.stat().st_size == 0:
+                  raise SystemExit(f'Empty Room schema file: {path}')
+              with path.open(encoding='utf-8') as handle:
+                  data = json.load(handle)
+              version = data.get('database', {}).get('version')
+              if version is None:
+                  raise SystemExit(f'Missing database version in {path}')
+              if path.stem != str(version):
+                  raise SystemExit(f'Schema filename/version mismatch: {path} contains version {version}')
+              versions.append(version)
+              print(f'validated {path} (version {version})')
+          expected = list(range(1, max(versions) + 1))
+          if versions != expected:
+              raise SystemExit(f'Room schema history is incomplete: found {versions}, expected {expected}')
+          PY
       - name: Run tests and build debug APKs
         shell: bash
         run: |
-          set +e
-          gradle test assembleDebug assembleDebugAndroidTest --console=plain > gradle-build.log 2>&1
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "GRADLE_BUILD_FAILURE"
-            grep -E "(^e: |error:|FAILURE:|What went wrong:|FAILED|Unresolved reference|Compilation error|Cannot find|Room cannot verify|Expected|actual)" gradle-build.log | tail -n 250 || true
-            exit "$status"
-          fi
-          echo "Gradle tests and debug builds passed"
+          set -o pipefail
+          ./gradlew \
+            --no-daemon \
+            --stacktrace \
+            clean \
+            testDebugUnitTest \
+            kspDebugKotlin \
+            kspReleaseKotlin \
+            assembleDebug \
+            assembleDebugAndroidTest \
+            --console=plain 2>&1 | tee gradle-build.log
       - name: Upload Gradle log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
           path: gradle-build.log
+          if-no-files-found: warn
           retention-days: 3
