@@ -52,11 +52,23 @@ object DatabaseProvider {
         }
     }
 
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Nullable protein keeps unknown distinct from an explicit 0 g assignment.
+            db.execSQL("ALTER TABLE ingredients ADD COLUMN proteinPerReferenceAmount REAL")
+            // Historical meals stay unknown; no recipe or ingredient data is applied retroactively.
+            db.execSQL("ALTER TABLE meal_logs ADD COLUMN proteinGramsSnapshot REAL")
+            db.execSQL("ALTER TABLE meal_logs ADD COLUMN proteinDataComplete INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE meal_logs ADD COLUMN missingProteinItemCount INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     val ALL_MIGRATIONS: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
         MIGRATION_3_4,
-        MIGRATION_4_5
+        MIGRATION_4_5,
+        MIGRATION_5_6
     )
 
     @Volatile private var instance: CalorieStreakDatabase? = null
