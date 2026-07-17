@@ -210,6 +210,7 @@ fun CalorieStreakNavHost(
                 composable("statistics") {
                     StatisticsScreen(
                         meals = state.meals,
+                        ingredients = state.allIngredients,
                         currentStreak = state.currentStreak,
                         bestStreak = state.bestStreak,
                         targetCalories = state.target,
