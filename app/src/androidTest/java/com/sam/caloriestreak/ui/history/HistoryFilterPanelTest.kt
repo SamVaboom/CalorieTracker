@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -45,7 +46,8 @@ class HistoryFilterPanelTest {
         composeRule.onNodeWithText("All time").assertIsDisplayed()
         composeRule.onNodeWithText("Graph").performClick()
         composeRule.onNodeWithText("Score %").assertIsDisplayed()
-        composeRule.onNodeWithText("Calories", useUnmergedTree = true).performClick()
+        // Category Calories is the first node; metric Calories is the second.
+        composeRule.onAllNodesWithText("Calories")[1].performClick()
         composeRule.onNodeWithText("All time").performClick()
         composeRule.onNodeWithContentDescription("Collapse History filters").performClick()
         composeRule.onNodeWithText("Calories · Graph · Calories · All time").assertIsDisplayed()
