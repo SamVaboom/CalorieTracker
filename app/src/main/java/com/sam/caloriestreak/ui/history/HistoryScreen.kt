@@ -1,5 +1,11 @@
 package com.sam.caloriestreak.ui.history
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,11 +21,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -48,6 +62,9 @@ import com.sam.caloriestreak.domain.history.HistoryGraphDefaults
 import com.sam.caloriestreak.domain.history.HistoryMetric
 import com.sam.caloriestreak.domain.history.HistoryRange
 import com.sam.caloriestreak.domain.history.HistorySeriesBuilder
+import com.sam.caloriestreak.domain.protein.DailyProteinCalculator
+import com.sam.caloriestreak.domain.protein.ProteinFormatter
+import com.sam.caloriestreak.domain.protein.ProteinHistorySeriesBuilder
 import com.sam.caloriestreak.ui.components.AppCard
 import com.sam.caloriestreak.ui.components.AppChartContainer
 import com.sam.caloriestreak.ui.components.AppEmptyState
@@ -56,13 +73,18 @@ import com.sam.caloriestreak.ui.components.MealLogRow
 import com.sam.caloriestreak.ui.theme.AppColors
 import com.sam.caloriestreak.ui.theme.AppDimensions
 import java.text.DateFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import kotlin.math.abs
 
-private enum class HistoryCategory(val label: String) { CALORIES("Calories"), WEIGHT("Weight") }
-private enum class HistoryMode(val label: String) { LIST("List"), GRAPH("Graph") }
+internal enum class HistoryCategory(val label: String) {
+    CALORIES("Calories"), WEIGHT("Weight"), PROTEIN("Protein")
+}
+
+internal enum class HistoryMode(val label: String) { LIST("List"), GRAPH("Graph") }
 
 @Composable
 fun HistoryScreen(
@@ -73,54 +95,150 @@ fun HistoryScreen(
     weightGoal: Double?,
     onDelete: (MealLogEntity) -> Unit
 ) {
-    var category by rememberSaveable { androidx.compose.runtime.mutableStateOf(HistoryCategory.CALORIES) }
-    var mode by rememberSaveable { androidx.compose.runtime.mutableStateOf(HistoryMode.LIST) }
-    var metric by rememberSaveable { androidx.compose.runtime.mutableStateOf(HistoryGraphDefaults.metric) }
-    var range by rememberSaveable { androidx.compose.runtime.mutableStateOf(HistoryGraphDefaults.range) }
+    var category by rememberSaveable { mutableStateOf(HistoryCategory.CALORIES) }
+    var mode by rememberSaveable { mutableStateOf(HistoryMode.LIST) }
+    var metric by rememberSaveable { mutableStateOf(HistoryGraphDefaults.metric) }
+    var range by rememberSaveable { mutableStateOf(HistoryGraphDefaults.range) }
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = AppDimensions.ScreenPadding, vertical = AppDimensions.Space16)) {
-            AppSectionHeader("History", subtitle = "Review calories and recorded weight over time")
-            AppCard(Modifier.fillMaxWidth().padding(top = AppDimensions.Space12)) {
-                Text("Category", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8), modifier = Modifier.padding(top = AppDimensions.Space8)) {
-                    HistoryCategory.entries.forEach { option ->
-                        FilterChip(selected = category == option, onClick = { category = option }, label = { Text(option.label) })
-                    }
-                }
-                Text("View", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = AppDimensions.Space12))
-                Row(horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8), modifier = Modifier.padding(top = AppDimensions.Space8)) {
-                    HistoryMode.entries.forEach { option ->
-                        FilterChip(selected = mode == option, onClick = { mode = option }, label = { Text(option.label) })
-                    }
-                }
-                if (mode == HistoryMode.GRAPH && category == HistoryCategory.CALORIES) {
-                    Text("Metric", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = AppDimensions.Space12))
-                    Row(horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8), modifier = Modifier.padding(top = AppDimensions.Space8)) {
-                        HistoryMetric.entries.forEach { option ->
-                            FilterChip(selected = metric == option, onClick = { metric = option }, label = { Text(option.label) })
-                        }
-                    }
-                }
-                if (mode == HistoryMode.GRAPH) {
-                    Text("Time range", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = AppDimensions.Space12))
-                    RangeChips(range) { range = it }
-                }
-            }
+            AppSectionHeader("History", subtitle = "Review calories, weight and known protein over time")
+            HistoryFilterPanel(
+                category = category,
+                mode = mode,
+                metric = metric,
+                range = range,
+                expanded = filtersExpanded,
+                onExpandedChange = { filtersExpanded = it },
+                onCategoryChange = { category = it },
+                onModeChange = { mode = it },
+                onMetricChange = { metric = it },
+                onRangeChange = { range = it }
+            )
         }
 
-        if (category == HistoryCategory.CALORIES) {
-            when (mode) {
-                HistoryMode.LIST -> CalorieHistoryList(meals, dailyLogs, targetCalories, onDelete)
+        when (category) {
+            HistoryCategory.CALORIES -> when (mode) {
+                HistoryMode.LIST -> CalorieHistoryList(meals, dailyLogs, targetCalories, range, onDelete)
                 HistoryMode.GRAPH -> CalorieGraphMode(meals, dailyLogs, targetCalories, metric, range)
             }
-        } else {
-            when (mode) {
-                HistoryMode.LIST -> WeightHistoryList(weights)
+            HistoryCategory.WEIGHT -> when (mode) {
+                HistoryMode.LIST -> WeightHistoryList(weights, range)
                 HistoryMode.GRAPH -> WeightGraphMode(weights, weightGoal, range)
+            }
+            HistoryCategory.PROTEIN -> when (mode) {
+                HistoryMode.LIST -> ProteinHistoryList(meals, range)
+                HistoryMode.GRAPH -> ProteinGraphMode(meals, range)
             }
         }
     }
+}
+
+@Composable
+internal fun HistoryFilterPanel(
+    category: HistoryCategory,
+    mode: HistoryMode,
+    metric: HistoryMetric,
+    range: HistoryRange,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onCategoryChange: (HistoryCategory) -> Unit,
+    onModeChange: (HistoryMode) -> Unit,
+    onMetricChange: (HistoryMetric) -> Unit,
+    onRangeChange: (HistoryRange) -> Unit
+) {
+    val summary = buildList {
+        add(category.label)
+        add(mode.label)
+        if (category == HistoryCategory.CALORIES && mode == HistoryMode.GRAPH) add(metric.label)
+        add(range.label)
+    }.joinToString(" · ")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = AppDimensions.Space12)
+            .animateContentSize()
+            .testTag("history_filter_panel"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = AppDimensions.Space16, top = AppDimensions.Space8, bottom = AppDimensions.Space8),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(Modifier.weight(1f).padding(vertical = AppDimensions.Space8)) {
+                Icon(Icons.Outlined.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = AppDimensions.Space8).testTag("history_filter_summary")
+                )
+            }
+            IconButton(onClick = { onExpandedChange(!expanded) }) {
+                Icon(
+                    if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = if (expanded) "Collapse History filters" else "Expand History filters"
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+            modifier = Modifier.testTag("history_filter_details")
+        ) {
+            Column(Modifier.fillMaxWidth().padding(start = AppDimensions.Space16, end = AppDimensions.Space16, bottom = AppDimensions.Space16)) {
+                FilterLabel("Category")
+                ScrollableChips {
+                    HistoryCategory.entries.forEach { option ->
+                        FilterChip(selected = category == option, onClick = { onCategoryChange(option) }, label = { Text(option.label) })
+                    }
+                }
+                FilterLabel("View")
+                ScrollableChips {
+                    HistoryMode.entries.forEach { option ->
+                        FilterChip(selected = mode == option, onClick = { onModeChange(option) }, label = { Text(option.label) })
+                    }
+                }
+                if (category == HistoryCategory.CALORIES && mode == HistoryMode.GRAPH) {
+                    FilterLabel("Metric")
+                    ScrollableChips {
+                        HistoryMetric.entries.forEach { option ->
+                            FilterChip(selected = metric == option, onClick = { onMetricChange(option) }, label = { Text(option.label) })
+                        }
+                    }
+                }
+                FilterLabel("Time range")
+                ScrollableChips {
+                    HistoryRange.entries.forEach { option ->
+                        FilterChip(selected = range == option, onClick = { onRangeChange(option) }, label = { Text(option.label) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = AppDimensions.Space8)
+    )
+}
+
+@Composable
+private fun ScrollableChips(content: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = AppDimensions.Space4),
+        horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)
+    ) { content() }
 }
 
 @Composable
@@ -128,15 +246,25 @@ private fun CalorieHistoryList(
     meals: List<MealLogEntity>,
     dailyLogs: List<DailyLogEntity>,
     targetCalories: Double,
+    range: HistoryRange,
     onDelete: (MealLogEntity) -> Unit
 ) {
+    val today = LocalDate.now().toEpochDay()
+    val cutoff = range.dayCount?.let { today - it + 1 }
     val mealsByDay = remember(meals) { meals.groupBy { it.dateEpochDay } }
     val dailyByDay = remember(dailyLogs) { dailyLogs.associateBy { it.dateEpochDay } }
-    val days = remember(meals, dailyLogs) { (meals.map { it.dateEpochDay } + dailyLogs.map { it.dateEpochDay }).distinct().sortedDescending() }
-    LazyColumn(contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = AppDimensions.Space32), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
-        if (days.isEmpty()) {
-            item { AppEmptyState(Icons.Outlined.History, "No calorie history yet", "Log food to create your first tracked day.") }
-        }
+    val days = remember(meals, dailyLogs, range, today) {
+        (meals.map { it.dateEpochDay } + dailyLogs.map { it.dateEpochDay })
+            .distinct()
+            .filter { cutoff == null || it >= cutoff }
+            .sortedDescending()
+    }
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)
+    ) {
+        if (days.isEmpty()) item { AppEmptyState(Icons.Outlined.History, "No calorie history in this range", "Log food or choose another range.") }
         days.forEach { day ->
             val dayMeals = mealsByDay[day].orEmpty()
             val total = dayMeals.sumOf { it.calories }
@@ -179,31 +307,40 @@ private fun CalorieGraphMode(
     val today = LocalDate.now().toEpochDay()
     val points = remember(meals, dailyLogs, range, today) { HistorySeriesBuilder.build(meals, dailyLogs, range, today) }
     val hasData = remember(points, dailyLogs) { HistorySeriesBuilder.hasTrackedData(points, dailyLogs) }
-    LazyColumn(contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = AppDimensions.Space32)) {
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp)
+    ) {
         item {
-            if (!hasData) {
-                AppEmptyState(Icons.Outlined.History, "No data in this range", "Choose another range or log food first.")
-            } else {
-                AppChartContainer(
-                    title = if (metric == HistoryMetric.SCORE) "Daily score" else "Daily calories",
-                    subtitle = range.label,
-                    accent = if (metric == HistoryMetric.SCORE) AppColors.Violet else AppColors.Coral
-                ) { HistoryChart(points, metric, targetCalories) }
-            }
+            if (!hasData) AppEmptyState(Icons.Outlined.History, "No data in this range", "Choose another range or log food first.")
+            else AppChartContainer(
+                title = if (metric == HistoryMetric.SCORE) "Daily score" else "Daily calories",
+                subtitle = range.label,
+                accent = if (metric == HistoryMetric.SCORE) AppColors.Violet else AppColors.Coral
+            ) { HistoryChart(points, metric, targetCalories) }
         }
     }
 }
 
 @Composable
-private fun WeightHistoryList(weights: List<WeightEntryEntity>) {
-    val sorted = weights.sortedByDescending { it.timestamp }
+private fun WeightHistoryList(weights: List<WeightEntryEntity>, range: HistoryRange) {
+    val today = LocalDate.now().toEpochDay()
+    val cutoff = range.dayCount?.let { today - it + 1 }
+    val zone = ZoneId.systemDefault()
+    val filtered = remember(weights, range, today) {
+        weights.filter {
+            cutoff == null || Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate().toEpochDay() >= cutoff
+        }.sortedByDescending { it.timestamp }
+    }
     val ascending = weights.sortedBy { it.timestamp }
     val changeById = remember(ascending) { ascending.mapIndexed { index, entry -> entry.id to if (index == 0) null else entry.kilograms - ascending[index - 1].kilograms }.toMap() }
-    LazyColumn(contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = AppDimensions.Space32), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
-        if (sorted.isEmpty()) {
-            item { AppEmptyState(Icons.Outlined.MonitorWeight, "No weight history yet", "Weight entries appear here without filling missing dates.") }
-        }
-        items(sorted, key = { it.id }) { entry ->
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)
+    ) {
+        if (filtered.isEmpty()) item { AppEmptyState(Icons.Outlined.MonitorWeight, "No weight history in this range", "Add a weight entry or choose another range.") }
+        items(filtered, key = { it.id }) { entry ->
             val change = changeById[entry.id]
             val headline = buildString {
                 append("%.1f kg".format(entry.kilograms))
@@ -226,19 +363,83 @@ private fun WeightHistoryList(weights: List<WeightEntryEntity>) {
 
 @Composable
 private fun WeightGraphMode(weights: List<WeightEntryEntity>, weightGoal: Double?, range: HistoryRange) {
-    val days = when (range) {
-        HistoryRange.WEEK -> 7L
-        HistoryRange.MONTH -> 30L
-        HistoryRange.YEAR -> 365L
-        HistoryRange.ALL -> null
-    }
-    val cutoff = days?.let { System.currentTimeMillis() - it * 86_400_000L } ?: Long.MIN_VALUE
+    val cutoff = range.dayCount?.let { System.currentTimeMillis() - it * 86_400_000L } ?: Long.MIN_VALUE
     val points = weights.filter { it.timestamp >= cutoff }.sortedBy { it.timestamp }
-    LazyColumn(contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = AppDimensions.Space32)) {
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp)
+    ) {
         item {
             AppChartContainer(title = "Weight trend", subtitle = "${range.label} · actual entries only", accent = AppColors.Weight) {
                 if (points.size < 2) Text("Add at least two weight entries in this range.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else WeightHistoryChart(points, weightGoal)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProteinHistoryList(meals: List<MealLogEntity>, range: HistoryRange) {
+    val today = LocalDate.now().toEpochDay()
+    val cutoff = range.dayCount?.let { today - it + 1 }
+    val days = remember(meals, range, today) {
+        meals.groupBy { it.dateEpochDay }
+            .filterKeys { cutoff == null || it >= cutoff }
+            .toList()
+            .sortedByDescending { it.first }
+    }
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)
+    ) {
+        if (days.isEmpty()) item { AppEmptyState(Icons.Outlined.FitnessCenter, "No protein history in this range", "New meals with protein snapshots will appear here.") }
+        days.forEach { (day, dayMeals) ->
+            val summary = DailyProteinCalculator.calculate(dayMeals)
+            item(key = "protein-day-$day") {
+                AppCard(Modifier.fillMaxWidth()) {
+                    Text(LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy")), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        ProteinFormatter.known(summary),
+                        color = if (summary.complete) AppColors.Cyan else AppColors.Warning,
+                        modifier = Modifier.padding(top = AppDimensions.Space4)
+                    )
+                    if (!summary.complete) {
+                        Text(
+                            "${summary.missingCount} logged item${if (summary.missingCount == 1) " has" else "s have"} unknown protein",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            items(dayMeals, key = { "protein-${it.id}" }) { meal ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = MaterialTheme.shapes.medium) {
+                    Row(Modifier.fillMaxWidth().padding(AppDimensions.Space12), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(meal.recipeName, modifier = Modifier.weight(1f))
+                        Text(
+                            meal.proteinGramsSnapshot?.let(ProteinFormatter::grams) ?: "Protein unknown",
+                            color = if (meal.proteinGramsSnapshot != null) AppColors.Cyan else AppColors.Warning
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProteinGraphMode(meals: List<MealLogEntity>, range: HistoryRange) {
+    val today = LocalDate.now().toEpochDay()
+    val points = remember(meals, range, today) { ProteinHistorySeriesBuilder.build(meals, range, today) }
+    LazyColumn(
+        modifier = Modifier.testTag("history_content"),
+        contentPadding = PaddingValues(start = AppDimensions.ScreenPadding, end = AppDimensions.ScreenPadding, bottom = 96.dp)
+    ) {
+        item {
+            if (points.isEmpty()) AppEmptyState(Icons.Outlined.FitnessCenter, "No known protein in this range", "Unknown-only dates are not plotted as zero.")
+            else AppChartContainer(title = "Known daily protein", subtitle = range.label, accent = AppColors.Cyan) {
+                ProteinHistoryChart(points)
             }
         }
     }
@@ -280,13 +481,6 @@ private fun WeightHistoryChart(points: List<WeightEntryEntity>, weightGoal: Doub
         }
     }
     weightGoal?.let { Text("Goal line: %.1f kg".format(it), color = AppColors.Achievement, style = MaterialTheme.typography.labelMedium) }
-}
-
-@Composable
-private fun RangeChips(range: HistoryRange, onRangeChange: (HistoryRange) -> Unit) {
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = AppDimensions.Space8), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
-        HistoryRange.entries.forEach { option -> FilterChip(range == option, { onRangeChange(option) }, label = { Text(option.label) }) }
-    }
 }
 
 private fun scoreColor(score: Double) = when {
