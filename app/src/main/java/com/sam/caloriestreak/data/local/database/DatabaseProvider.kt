@@ -41,11 +41,22 @@ object DatabaseProvider {
         }
     }
 
+    private val migration4To5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Existing achievements predate unlock dialogs, so do not replay them after upgrading.
+            db.execSQL("ALTER TABLE earned_achievements ADD COLUMN popupDismissed INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE earned_achievements ADD COLUMN popupSuppressed INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE earned_achievements ADD COLUMN unlockSource TEXT NOT NULL DEFAULT 'LEGACY'")
+            db.execSQL("CREATE TABLE IF NOT EXISTS achievement_popup_summaries (id TEXT NOT NULL PRIMARY KEY, achievementCount INTEGER NOT NULL, createdAt INTEGER NOT NULL, dismissed INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_achievement_popup_summaries_createdAt ON achievement_popup_summaries(createdAt)")
+        }
+    }
+
     @Volatile private var instance: CalorieStreakDatabase? = null
 
     fun get(context: Context): CalorieStreakDatabase = instance ?: synchronized(this) {
         instance ?: Room.databaseBuilder(context.applicationContext, CalorieStreakDatabase::class.java, "calorie_streak.db")
-            .addMigrations(migration1To2, migration2To3, migration3To4)
+            .addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
             .build()
             .also { instance = it }
     }

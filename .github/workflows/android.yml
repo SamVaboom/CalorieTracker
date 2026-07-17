@@ -17,5 +17,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Run tests and build debug APK
-        run: gradle test assembleDebug --console=plain
+      - name: Run tests and build debug APKs
+        shell: bash
+        run: |
+          set +e
+          gradle test assembleDebug assembleDebugAndroidTest --console=plain > gradle-build.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "GRADLE_BUILD_FAILURE"
+            grep -E "(^e: |error:|FAILURE:|What went wrong:|FAILED|Unresolved reference|Compilation error|Cannot find|Room cannot verify|Expected|actual)" gradle-build.log | tail -n 250 || true
+            exit "$status"
+          fi
+          echo "Gradle tests and debug builds passed"
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: gradle-build.log
+          retention-days: 3

@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import com.sam.caloriestreak.data.local.dao.AppDao
 import com.sam.caloriestreak.data.local.dao.FeatureDao
 import com.sam.caloriestreak.data.local.dao.IngredientDao
+import com.sam.caloriestreak.data.local.entity.AchievementPopupSummaryEntity
 import com.sam.caloriestreak.data.local.entity.ActivityEventEntity
 import com.sam.caloriestreak.data.local.entity.DailyLogEntity
 import com.sam.caloriestreak.data.local.entity.EarnedAchievementEntity
@@ -25,9 +26,10 @@ import com.sam.caloriestreak.data.local.entity.WeightEntryEntity
         DailyLogEntity::class,
         WeightEntryEntity::class,
         EarnedAchievementEntity::class,
-        ActivityEventEntity::class
+        ActivityEventEntity::class,
+        AchievementPopupSummaryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class CalorieStreakDatabase : RoomDatabase() {

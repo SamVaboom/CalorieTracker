@@ -1,14 +1,15 @@
 package com.sam.caloriestreak.ui.statistics
 
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,11 +17,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
 import com.sam.caloriestreak.domain.calculation.ScoreDisplay
 import com.sam.caloriestreak.domain.weight.WeightStats
+import com.sam.caloriestreak.ui.components.AppCard
+import com.sam.caloriestreak.ui.components.AppSectionHeader
+import com.sam.caloriestreak.ui.components.AppStatCard
+import com.sam.caloriestreak.ui.theme.AppColors
+import com.sam.caloriestreak.ui.theme.AppDimensions
 import java.text.DateFormat
 import java.time.LocalDate
 import java.util.Date
@@ -44,68 +49,121 @@ fun StatisticsScreen(
 ) {
     var section by remember { mutableStateOf(StatisticsSection.ALL) }
     val calculator = remember(targetCalories) { ScoreCalculator.forTarget(targetCalories) }
-    val byDay = meals.groupBy { it.dateEpochDay }.mapValues { (_, values) -> values.sumOf { it.calories } }
+    val byDay = remember(meals) { meals.groupBy { it.dateEpochDay }.mapValues { (_, values) -> values.sumOf { it.calories } } }
     val today = LocalDate.now().toEpochDay()
     val last7 = (0L..6L).map { byDay[today - it] ?: 0.0 }
     val last30 = (0L..29L).map { byDay[today - it] ?: 0.0 }
+    val average7Score = ScoreDisplay.percent(last7.map(calculator::calculate).average())
+    val average30Score = ScoreDisplay.percent(last30.map(calculator::calculate).average())
+    val completion = if (totalAchievements > 0) earnedAchievements * 100 / totalAchievements else 0
 
-    Column(Modifier.padding(16.dp)) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-            StatisticsSection.entries.forEach { option ->
-                FilterChip(
-                    selected = section == option,
-                    onClick = { section = option },
-                    label = { Text(option.label) },
-                    modifier = Modifier.padding(end = 4.dp)
+    LazyColumn(
+        contentPadding = PaddingValues(AppDimensions.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(AppDimensions.Space16)
+    ) {
+        item { AppSectionHeader("Statistics", subtitle = "A clear view of your tracking history") }
+        item {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                StatisticsSection.entries.forEach { option ->
+                    FilterChip(
+                        selected = section == option,
+                        onClick = { section = option },
+                        label = { Text(option.label) },
+                        modifier = Modifier.padding(end = AppDimensions.Space8)
+                    )
+                }
+            }
+        }
+
+        if (section == StatisticsSection.ALL || section == StatisticsSection.CALORIES) {
+            item { AppSectionHeader("Calories", subtitle = "Averages use the existing app calculation") }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("7-day score", "$average7Score%", Modifier.weight(1f), "${last7.average().toInt()} kcal/day", AppColors.Cyan)
+                    AppStatCard("30-day score", "$average30Score%", Modifier.weight(1f), "${last30.average().toInt()} kcal/day", AppColors.Violet)
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("Tracked days", byDay.size.toString(), Modifier.weight(1f), accent = AppColors.Coral)
+                    AppStatCard("Current target", "${targetCalories.toInt()} kcal", Modifier.weight(1f), accent = AppColors.Warning)
+                }
+            }
+        }
+
+        if (section == StatisticsSection.ALL || section == StatisticsSection.STREAKS) {
+            item { AppSectionHeader("Streaks & Freezes") }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("Current streak", "$currentStreak days", Modifier.weight(1f), accent = AppColors.Coral)
+                    AppStatCard("Best streak", "$bestStreak days", Modifier.weight(1f), accent = AppColors.Achievement)
+                }
+            }
+            item {
+                AppCard(Modifier.fillMaxWidth()) {
+                    Text("Freeze inventory", style = MaterialTheme.typography.titleMedium)
+                    Text("$freezes / 3 stored", style = MaterialTheme.typography.headlineSmall, color = AppColors.Freeze, modifier = Modifier.padding(top = AppDimensions.Space8))
+                    Text(
+                        "$freezeProgress / $freezeRequiredDays qualifying days toward the next freeze",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = AppDimensions.Space4)
+                    )
+                }
+            }
+        }
+
+        if (section == StatisticsSection.ALL || section == StatisticsSection.WEIGHT) {
+            item { AppSectionHeader("Weight", subtitle = "Only recorded entries are included") }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("Latest", kg(weight.latest), Modifier.weight(1f), change(weight.changeFromPrevious) + " since previous", AppColors.Weight)
+                    AppStatCard("Since first", change(weight.changeFromFirst), Modifier.weight(1f), "First: ${kg(weight.first)}", AppColors.Success)
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
+                    AppStatCard("Lowest", kg(weight.lowest), Modifier.weight(1f), accent = AppColors.Cyan)
+                    AppStatCard("Highest", kg(weight.highest), Modifier.weight(1f), accent = AppColors.Coral)
+                }
+            }
+            item {
+                AppCard(Modifier.fillMaxWidth()) {
+                    Text("Weight averages", style = MaterialTheme.typography.titleMedium)
+                    StatLine("Last week", kg(weight.averageWeek))
+                    StatLine("Last month", kg(weight.averageMonth))
+                    StatLine("Past year", kg(weight.averageYear))
+                    StatLine("All time", kg(weight.averageAll))
+                    StatLine("Entries", "${weight.entryCount} on ${weight.distinctDates} dates")
+                    StatLine("Longest gap", "${weight.longestGapDays} days")
+                    StatLine("Most recent", weight.mostRecentTimestamp?.let { DateFormat.getDateInstance().format(Date(it)) } ?: "—")
+                }
+            }
+        }
+
+        if (section == StatisticsSection.ALL || section == StatisticsSection.ACHIEVEMENTS) {
+            item { AppSectionHeader("Achievements") }
+            item {
+                AppStatCard(
+                    title = "Collection progress",
+                    value = "$earnedAchievements / $totalAchievements",
+                    supportingText = "$completion% complete",
+                    accent = AppColors.Achievement,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-        }
-        if (section == StatisticsSection.ALL || section == StatisticsSection.CALORIES) {
-            StatCard("Calories") {
-                Text("7-day average: ${last7.average().toInt()} kcal · ${ScoreDisplay.percent(last7.map(calculator::calculate).average())}%")
-                Text("30-day average: ${last30.average().toInt()} kcal · ${ScoreDisplay.percent(last30.map(calculator::calculate).average())}%")
-                Text("Tracked calorie days: ${byDay.size}")
-                Text("Current target: ${targetCalories.toInt()} kcal")
-            }
-        }
-        if (section == StatisticsSection.ALL || section == StatisticsSection.STREAKS) {
-            StatCard("Streaks & Freezes") {
-                Text("Current streak: $currentStreak")
-                Text("Best streak: $bestStreak")
-                Text("Stored freezes: $freezes / 3")
-                Text("Freeze progress: $freezeProgress / $freezeRequiredDays")
-            }
-        }
-        if (section == StatisticsSection.ALL || section == StatisticsSection.WEIGHT) {
-            StatCard("Weight") {
-                Text("Latest: ${kg(weight.latest)}")
-                Text("First: ${kg(weight.first)}")
-                Text("Change since first: ${change(weight.changeFromFirst)}")
-                Text("Change since previous: ${change(weight.changeFromPrevious)}")
-                Text("Lowest: ${kg(weight.lowest)}")
-                Text("Highest: ${kg(weight.highest)}")
-                Text("Last-week average: ${kg(weight.averageWeek)}")
-                Text("Last-month average: ${kg(weight.averageMonth)}")
-                Text("Past-year average: ${kg(weight.averageYear)}")
-                Text("All-time average: ${kg(weight.averageAll)}")
-                Text("Entries: ${weight.entryCount} on ${weight.distinctDates} distinct dates")
-                Text("Longest recording gap: ${weight.longestGapDays} days")
-                Text("Most recent: ${weight.mostRecentTimestamp?.let { DateFormat.getDateInstance().format(Date(it)) } ?: "—"}")
-            }
-        }
-        if (section == StatisticsSection.ALL || section == StatisticsSection.ACHIEVEMENTS) {
-            StatCard("Achievements") { Text("Earned: $earnedAchievements of $totalAchievements") }
         }
     }
 }
 
 @Composable
-private fun StatCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title)
-            content()
-        }
+private fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = AppDimensions.Space8),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
