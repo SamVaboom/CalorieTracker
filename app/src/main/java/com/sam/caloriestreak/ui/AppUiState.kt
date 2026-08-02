@@ -8,11 +8,23 @@ import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
 import com.sam.caloriestreak.domain.calculation.StreakRules
 
+data class RecipeIngredientSummary(
+    val item: RecipeItemEntity,
+    val calories: Double,
+    val proteinGrams: Double?,
+    val proteinAssigned: Boolean
+)
+
 data class RecipeSummary(
     val recipe: RecipeEntity,
     val items: List<RecipeItemEntity>,
     val totalCalories: Double,
-    val caloriesPerServing: Double
+    val caloriesPerServing: Double,
+    val ingredientDetails: List<RecipeIngredientSummary> = emptyList(),
+    val knownProteinGrams: Double = 0.0,
+    val proteinDataComplete: Boolean = false,
+    val missingProteinItemCount: Int = 0,
+    val proteinPerServing: Double? = null
 )
 
 data class AppUiState(

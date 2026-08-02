@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LocalGroceryStore
 import androidx.compose.material.icons.outlined.MonitorWeight
@@ -40,6 +41,7 @@ fun MoreScreen(
     unseenCount: Int,
     onGrocery: () -> Unit,
     onWeight: () -> Unit,
+    onProteinCorrections: () -> Unit,
     onAchievements: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -48,9 +50,7 @@ fun MoreScreen(
         contentPadding = PaddingValues(AppDimensions.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)
     ) {
-        item {
-            AppSectionHeader("More", subtitle = "Tools, progress and preferences")
-        }
+        item { AppSectionHeader("More", subtitle = "Tools, progress and preferences") }
         item {
             MoreRow(
                 title = "Grocery Lists",
@@ -67,6 +67,15 @@ fun MoreScreen(
                 icon = Icons.Outlined.MonitorWeight,
                 accent = AppColors.Weight,
                 onClick = onWeight
+            )
+        }
+        item {
+            MoreRow(
+                title = "Protein Corrections",
+                subtitle = "Explicitly correct historical meal protein",
+                icon = Icons.Outlined.EditNote,
+                accent = AppColors.Cyan,
+                onClick = onProteinCorrections
             )
         }
         item {

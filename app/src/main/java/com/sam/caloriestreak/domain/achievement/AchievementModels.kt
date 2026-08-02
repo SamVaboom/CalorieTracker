@@ -1,6 +1,18 @@
 package com.sam.caloriestreak.domain.achievement
 
-enum class AchievementCategory { TIME, CALORIES, SCORE, RECIPES, MEAL_HABITS, STREAKS, FREEZES, WEIGHT, GROCERY, HIDDEN }
+enum class AchievementCategory {
+    TIME,
+    CALORIES,
+    SCORE,
+    RECIPES,
+    MEAL_HABITS,
+    STREAKS,
+    FREEZES,
+    WEIGHT,
+    PROTEIN,
+    GROCERY,
+    HIDDEN
+}
 
 data class AchievementDefinition(
     val id: String,

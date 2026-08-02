@@ -58,7 +58,9 @@ fun DashboardScreen(
     onHistory: () -> Unit,
     onStatistics: () -> Unit,
     onFreezeToday: () -> Unit,
-    onDeleteMeal: (MealLogEntity) -> Unit
+    onDeleteMeal: (MealLogEntity) -> Unit,
+    onRecalculateProtein: ((MealLogEntity) -> Result<Unit>)? = null,
+    onSetManualProtein: ((MealLogEntity, Double?) -> Result<Unit>)? = null
 ) {
     val today = LocalDate.now()
     val todayMeals = state.meals.filter { it.dateEpochDay == today.toEpochDay() }
@@ -202,7 +204,14 @@ fun DashboardScreen(
                 }
             }
         } else {
-            items(todayMeals, key = { it.id }) { meal -> MealLogRow(meal = meal, onDelete = onDeleteMeal) }
+            items(todayMeals, key = { it.id }) { meal ->
+                MealLogRow(
+                    meal = meal,
+                    onDelete = onDeleteMeal,
+                    onRecalculateProtein = onRecalculateProtein,
+                    onSetManualProtein = onSetManualProtein
+                )
+            }
         }
     }
 

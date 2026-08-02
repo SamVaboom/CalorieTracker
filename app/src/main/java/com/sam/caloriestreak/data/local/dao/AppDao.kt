@@ -28,6 +28,9 @@ interface AppDao {
     @Query("SELECT * FROM recipe_items ORDER BY ingredientName")
     fun observeRecipeItems(): Flow<List<RecipeItemEntity>>
 
+    @Query("SELECT * FROM recipe_items ORDER BY recipeId, ingredientName")
+    suspend fun allRecipeItems(): List<RecipeItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRecipe(recipe: RecipeEntity)
 

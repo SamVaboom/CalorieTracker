@@ -33,25 +33,11 @@ object AchievementRegistry {
     )
 
     private val weightObjects = listOf(
-        1 to "First Step",
-        2 to "Large Watermelon",
-        3 to "Newborn baby",
-        4 to "A cat",
-        5 to "Five Down",
-        6 to "Watermelon",
-        7 to "Bowling ball",
-        8 to "Gallon of Paint",
-        9 to "Carry-on luggage",
-        10 to "Double Digits",
-        11 to "Car battery",
-        12 to "Mountain Bike",
-        13 to "Microwave",
-        14 to "Large Paint Container",
-        15 to "Cement Bag",
-        16 to "Kettlebell",
-        17 to "Checked Suitcase",
-        18 to "Car Wheel",
-        19 to "Commercial Vacuum"
+        1 to "First Step", 2 to "Large Watermelon", 3 to "Newborn baby", 4 to "A cat",
+        5 to "Five Down", 6 to "Watermelon", 7 to "Bowling ball", 8 to "Gallon of Paint",
+        9 to "Carry-on luggage", 10 to "Double Digits", 11 to "Car battery", 12 to "Mountain Bike",
+        13 to "Microwave", 14 to "Large Paint Container", 15 to "Cement Bag", 16 to "Kettlebell",
+        17 to "Checked Suitcase", 18 to "Car Wheel", 19 to "Commercial Vacuum"
     )
 
     val weight = buildList {
@@ -100,6 +86,47 @@ object AchievementRegistry {
         AchievementDefinition("freestyler", "Freestyler", "Log 25 manual calorie entries.", AchievementCategory.MEAL_HABITS, threshold = 25.0, sortOrder = 4015)
     )
 
+    val protein = listOf(
+        AchievementDefinition("protein_initiate", "Protein Initiate", "Every journey starts with a first serving.", AchievementCategory.PROTEIN, threshold = 50.0, sortOrder = 8001),
+        AchievementDefinition("protein_solid_foundation", "Solid Foundation", "Record at least 75 g of known protein in one day.", AchievementCategory.PROTEIN, threshold = 75.0, sortOrder = 8002),
+        AchievementDefinition("protein_triple_digits", "Triple Digits", "Welcome to triple digits.", AchievementCategory.PROTEIN, threshold = 100.0, sortOrder = 8003),
+        AchievementDefinition("protein_heavy_lifter", "Heavy Lifter", "Record at least 125 g of known protein in one day.", AchievementCategory.PROTEIN, threshold = 125.0, sortOrder = 8004),
+        AchievementDefinition("protein_150_club", "The 150 Club", "Record at least 150 g of known protein in one day.", AchievementCategory.PROTEIN, threshold = 150.0, sortOrder = 8005),
+        AchievementDefinition("protein_absolute_unit", "Absolute Unit", "Record at least 200 g of known protein in one day.", AchievementCategory.PROTEIN, hidden = true, threshold = 200.0, sortOrder = 8006),
+
+        AchievementDefinition("protein_snack", "Protein Snack", "Log one meal containing at least 20 g of protein.", AchievementCategory.PROTEIN, threshold = 20.0, sortOrder = 8010),
+        AchievementDefinition("protein_power_meal", "Power Meal", "Log one meal containing at least 30 g of protein.", AchievementCategory.PROTEIN, threshold = 30.0, sortOrder = 8011),
+        AchievementDefinition("protein_main_course", "Main Course", "Log one meal containing at least 50 g of protein.", AchievementCategory.PROTEIN, threshold = 50.0, sortOrder = 8012),
+        AchievementDefinition("protein_bomb", "Protein Bomb", "Log one meal containing at least 75 g of protein.", AchievementCategory.PROTEIN, threshold = 75.0, sortOrder = 8013),
+
+        AchievementDefinition("protein_kilo_club", "Kilo Club", "One kilogram of protein logged.", AchievementCategory.PROTEIN, threshold = 1_000.0, sortOrder = 8020),
+        AchievementDefinition("protein_five_kilo_sack", "Five-Kilo Sack", "Record at least 5,000 g of known protein.", AchievementCategory.PROTEIN, threshold = 5_000.0, sortOrder = 8021),
+        AchievementDefinition("protein_ten_kilo_plate", "Ten-Kilo Plate", "Record at least 10,000 g of known protein.", AchievementCategory.PROTEIN, threshold = 10_000.0, sortOrder = 8022),
+        AchievementDefinition("protein_warehouse", "Protein Warehouse", "Record at least 25,000 g of known protein.", AchievementCategory.PROTEIN, threshold = 25_000.0, sortOrder = 8023),
+        AchievementDefinition("protein_industrial_quantities", "Industrial Quantities", "Record at least 50,000 g of known protein.", AchievementCategory.PROTEIN, threshold = 50_000.0, sortOrder = 8024),
+        AchievementDefinition("protein_empire", "Protein Empire", "Record at least 100,000 g of known protein.", AchievementCategory.PROTEIN, threshold = 100_000.0, sortOrder = 8025),
+
+        AchievementDefinition("protein_pound_for_pound", "Pound for Pound", "Record at least 1 g of protein per kilogram of body weight in one day.", AchievementCategory.PROTEIN, sortOrder = 8030),
+        AchievementDefinition("protein_double_density", "Double Density", "Record at least 2 g of protein per kilogram of body weight in one day.", AchievementCategory.PROTEIN, sortOrder = 8031),
+        AchievementDefinition("protein_half_of_yourself", "Half of Yourself", "Log cumulative known protein equal to half your first valid recorded body weight.", AchievementCategory.PROTEIN, sortOrder = 8032),
+        AchievementDefinition("protein_eat_yourself", "Eat Yourself", "Log cumulative known protein equal to your first valid recorded body weight.", AchievementCategory.PROTEIN, sortOrder = 8033),
+
+        AchievementDefinition("protein_three_days", "Three Protein Days", "Record at least 100 g on three different calendar days.", AchievementCategory.PROTEIN, threshold = 3.0, sortOrder = 8040),
+        AchievementDefinition("protein_week", "Protein Week", "Record at least 100 g on seven different calendar days.", AchievementCategory.PROTEIN, threshold = 7.0, sortOrder = 8041),
+        AchievementDefinition("protein_routine", "Protein Routine", "Record at least 100 g on 20 days within a rolling 30-day period.", AchievementCategory.PROTEIN, threshold = 20.0, sortOrder = 8042),
+        AchievementDefinition("protein_triple_digit_streak", "Triple-Digit Streak", "Record at least 100 g for seven consecutive calendar days.", AchievementCategory.PROTEIN, threshold = 7.0, sortOrder = 8043),
+
+        AchievementDefinition("protein_detective", "Protein Detective", "Assign protein information to 25 active ingredients.", AchievementCategory.PROTEIN, threshold = 25.0, sortOrder = 8050),
+        AchievementDefinition("protein_librarian", "Protein Librarian", "Assign protein information to 100 active ingredients.", AchievementCategory.PROTEIN, threshold = 100.0, sortOrder = 8051),
+        AchievementDefinition("protein_no_mystery_macros", "No Mystery Macros", "Every active ingredient has protein assigned, with at least 25 active ingredients.", AchievementCategory.PROTEIN, sortOrder = 8052),
+        AchievementDefinition("protein_fully_calculated", "Fully Calculated", "Finish one recorded day where every logged meal has complete protein information.", AchievementCategory.PROTEIN, sortOrder = 8053),
+        AchievementDefinition("protein_complete_week", "Complete Week", "Record seven consecutive days where every logged meal has complete protein information.", AchievementCategory.PROTEIN, threshold = 7.0, sortOrder = 8054),
+
+        AchievementDefinition("protein_chef", "Protein Chef", "Create 10 active recipes with at least 20 g of fully calculable protein per serving.", AchievementCategory.PROTEIN, threshold = 10.0, sortOrder = 8060),
+        AchievementDefinition("protein_high_protein_menu", "High-Protein Menu", "Create 10 active recipes with at least 30 g of fully calculable protein per serving.", AchievementCategory.PROTEIN, threshold = 10.0, sortOrder = 8061),
+        AchievementDefinition("protein_explorer", "Protein Explorer", "Log 10 different saved recipes with at least 20 g of protein per logged serving.", AchievementCategory.PROTEIN, threshold = 10.0, sortOrder = 8062)
+    )
+
     val grocery = listOf(
         AchievementDefinition("shopping_spree", "Shopping Spree", "Generate 10 grocery lists.", AchievementCategory.GROCERY, threshold = 10.0, sortOrder = 5001),
         AchievementDefinition("organized", "Organized", "Check off every item in a grocery list.", AchievementCategory.GROCERY, sortOrder = 5002)
@@ -123,7 +150,8 @@ object AchievementRegistry {
     )
 
     val all: List<AchievementDefinition> =
-        time.map { it.asAchievement() } + weight + score + calories + mealsAndRecipes + grocery + freezes + funny
+        time.map { it.asAchievement() } + weight + score + calories + mealsAndRecipes + protein + grocery + freezes + funny
 
     val revocableWeightIds: Set<String> = weight.map { it.id }.toSet()
+    val revocableProteinIds: Set<String> = setOf("protein_no_mystery_macros")
 }

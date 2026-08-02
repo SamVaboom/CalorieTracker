@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.domain.search.SearchMatcher
 import com.sam.caloriestreak.ui.RecipeSummary
 import com.sam.caloriestreak.ui.components.AppSearchField
@@ -52,7 +53,7 @@ private enum class RecipeFilter { ALL, FAVORITES }
 fun LogFoodScreen(
     recipes: List<RecipeSummary>,
     onLogRecipe: (RecipeSummary, Double, String) -> Unit,
-    onManual: (String, Double) -> Unit
+    onManual: (String, Double, Double?) -> Unit
 ) {
     var manualDialog by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -106,9 +107,7 @@ fun LogFoodScreen(
             verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)
         ) {
             item { AppSectionHeader("Log Food", subtitle = "Quickly add a saved recipe or manual calories") }
-            item {
-                AppSearchField(query = query, onQueryChange = { query = it }, label = "Search recipes")
-            }
+            item { AppSearchField(query = query, onQueryChange = { query = it }, label = "Search recipes") }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
                     FilterChip(selected = filter == RecipeFilter.ALL, onClick = { filter = RecipeFilter.ALL }, label = { Text("All") })
@@ -156,6 +155,12 @@ fun LogFoodScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Text(
+                                    summary.proteinPerServing?.let { "${ProteinFormatter.grams(it)} protein per serving" }
+                                        ?: if (summary.knownProteinGrams > 0.0) "Protein data incomplete" else "Protein not assigned",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (summary.proteinDataComplete) AppColors.Cyan else AppColors.Warning
+                                )
                             }
                             if (summary.recipe.favorite) {
                                 Icon(Icons.Outlined.Favorite, contentDescription = "Favorite recipe", tint = AppColors.Violet)
@@ -178,8 +183,8 @@ fun LogFoodScreen(
     if (manualDialog) {
         ManualDialog(
             onDismiss = { manualDialog = false },
-            onSave = { description, calories ->
-                onManual(description, calories)
+            onSave = { description, calories, protein ->
+                onManual(description, calories, protein)
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 scope.launch { snackbarHostState.showSnackbar("$description · ${calories.toInt()} kcal added") }
                 manualDialog = false
@@ -189,10 +194,14 @@ fun LogFoodScreen(
 }
 
 @Composable
-private fun ManualDialog(onDismiss: () -> Unit, onSave: (String, Double) -> Unit) {
+private fun ManualDialog(onDismiss: () -> Unit, onSave: (String, Double, Double?) -> Unit) {
     var description by remember { mutableStateOf("") }
     var calories by remember { mutableStateOf("") }
-    val valid = description.isNotBlank() && (calories.toDoubleOrNull() ?: -1.0) >= 0.0
+    var protein by remember { mutableStateOf("") }
+    val proteinValue = protein.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+    val valid = description.isNotBlank() &&
+        (calories.toDoubleOrNull() ?: -1.0) >= 0.0 &&
+        (protein.isBlank() || (proteinValue != null && proteinValue >= 0.0))
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -202,10 +211,18 @@ private fun ManualDialog(onDismiss: () -> Unit, onSave: (String, Double) -> Unit
             Column(verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
                 OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(calories, { calories = it }, label = { Text("Calories") }, suffix = { Text("kcal") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = protein,
+                    onValueChange = { protein = it },
+                    label = { Text("Protein (optional)") },
+                    suffix = { Text("g") },
+                    supportingText = { Text("Leave blank when protein is unknown") },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onSave(description.trim(), calories.toDouble()) }) { Text("Log") }
+            TextButton(enabled = valid, onClick = { onSave(description.trim(), calories.toDouble(), proteinValue) }) { Text("Log") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )

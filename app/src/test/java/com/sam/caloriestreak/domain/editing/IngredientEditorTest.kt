@@ -15,6 +15,7 @@ class IngredientEditorTest {
         calories = 280.0,
         referenceAmount = 100.0,
         referenceUnit = "g",
+        proteinPerReferenceAmount = 22.0,
         category = "Dairy",
         favorite = false,
         archived = false,
@@ -23,24 +24,24 @@ class IngredientEditorTest {
     )
 
     @Test
-    fun existingIngredientLoadsIntoDraft() {
+    fun existingIngredientLoadsIntoDraftWithoutExposingLegacyBrand() {
         val draft = IngredientDraft.from(existing)
         assertEquals("Mozzarella", draft.name)
-        assertEquals("Old brand", draft.brand)
         assertEquals(280.0, draft.calories, 0.0001)
         assertEquals(100.0, draft.referenceAmount, 0.0001)
         assertEquals("g", draft.referenceUnit)
+        assertEquals(22.0, draft.proteinPerReferenceAmount!!, 0.0001)
         assertEquals("Dairy", draft.category)
     }
 
     @Test
-    fun editPreservesIdentityAndCreationTime() {
+    fun editPreservesIdentityCreationTimeAndLegacyBrand() {
         val updated = IngredientDraft.from(existing).copy(
             name = "Light Mozzarella",
-            brand = "New brand",
             calories = 250.0,
             referenceAmount = 125.0,
             referenceUnit = "g",
+            proteinPerReferenceAmount = 24.5,
             category = "Cheese",
             favorite = true,
             archived = true
@@ -50,9 +51,10 @@ class IngredientEditorTest {
         assertEquals(existing.createdAt, updated.createdAt)
         assertEquals(500L, updated.updatedAt)
         assertEquals("Light Mozzarella", updated.name)
-        assertEquals("New brand", updated.brand)
+        assertEquals("Old brand", updated.brand)
         assertEquals(250.0, updated.calories, 0.0001)
         assertEquals(125.0, updated.referenceAmount, 0.0001)
+        assertEquals(24.5, updated.proteinPerReferenceAmount!!, 0.0001)
         assertEquals("Cheese", updated.category)
         assertTrue(updated.favorite)
         assertTrue(updated.archived)
@@ -62,15 +64,16 @@ class IngredientEditorTest {
     fun blankOptionalFieldsBecomeNull() {
         val updated = IngredientDraft(
             name = "Tomato",
-            brand = "  ",
             calories = 20.0,
             referenceAmount = 100.0,
             referenceUnit = "g",
+            proteinPerReferenceAmount = null,
             category = ""
         ).toEntity(existing = null, id = "new", now = 10L)
 
         assertNull(updated.brand)
         assertNull(updated.category)
+        assertNull(updated.proteinPerReferenceAmount)
     }
 
     @Test
@@ -79,6 +82,7 @@ class IngredientEditorTest {
         assertFalse(IngredientDraft(name = "X", calories = -1.0).isValid())
         assertFalse(IngredientDraft(name = "X", calories = 1.0, referenceAmount = 0.0).isValid())
         assertFalse(IngredientDraft(name = "X", calories = 1.0, referenceUnit = " ").isValid())
-        assertTrue(IngredientDraft(name = "X", calories = 0.0, referenceAmount = 1.0, referenceUnit = "piece").isValid())
+        assertFalse(IngredientDraft(name = "X", calories = 1.0, proteinPerReferenceAmount = -0.1).isValid())
+        assertTrue(IngredientDraft(name = "X", calories = 0.0, referenceAmount = 1.0, referenceUnit = "piece", proteinPerReferenceAmount = 0.0).isValid())
     }
 }
