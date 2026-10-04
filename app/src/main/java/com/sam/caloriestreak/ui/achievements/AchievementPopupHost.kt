@@ -308,7 +308,6 @@ private fun categoryAccent(category: AchievementCategory): Color = when (categor
     AchievementCategory.GROCERY -> AppColors.Weight
     AchievementCategory.FREEZES -> AppColors.Freeze
     AchievementCategory.WEIGHT -> AppColors.Success
-    AchievementCategory.PROTEIN -> AppColors.Cyan
     AchievementCategory.HIDDEN -> AppColors.Locked
     AchievementCategory.STREAKS -> AppColors.Warning
 }

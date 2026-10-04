@@ -15,7 +15,6 @@ import com.sam.caloriestreak.data.settings.SettingsStore
 import com.sam.caloriestreak.domain.achievement.AchievementEvaluator
 import com.sam.caloriestreak.domain.achievement.AchievementPopupPolicy
 import com.sam.caloriestreak.domain.achievement.AchievementRegistry
-import com.sam.caloriestreak.domain.achievement.ProteinAchievementEvaluator
 import com.sam.caloriestreak.domain.calculation.StreakCalculator
 import com.sam.caloriestreak.domain.weight.WeightStatistics
 import java.time.Instant
@@ -156,7 +155,6 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
         val weights = dao.allWeights()
         val events = dao.allActivityEvents()
         val recipes = appDao.allRecipes()
-        val recipeItems = appDao.allRecipeItems()
         val ingredients = ingredientDao.all()
         val weightGoal = settings.weightGoal.first()
         val currentFreezes = StreakCalculator.calculate(daily).freezes
@@ -169,13 +167,6 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val eligibleWeightIds = AchievementEvaluator.eligibleWeightAchievements(weights, weightGoal)
-        val eligibleProteinIds = ProteinAchievementEvaluator.eligibleAchievements(
-            meals = meals,
-            ingredients = ingredients,
-            recipes = recipes,
-            recipeItems = recipeItems,
-            weights = weights
-        )
         val eligibleIds = buildSet {
             addAll(AchievementEvaluator.eligibleTimeAchievements(meals).map { it.id })
             addAll(eligibleWeightIds)
@@ -183,11 +174,9 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
             addAll(AchievementEvaluator.eligibleMealAndRecipeAchievements(meals, recipes.size, ingredients.size))
             addAll(AchievementEvaluator.eligibleFreezeAchievements(daily, currentFreezes, events))
             addAll(AchievementEvaluator.eligibleActivityAchievements(events))
-            addAll(eligibleProteinIds)
         }
 
-        val revocableIds = AchievementRegistry.revocableWeightIds + AchievementRegistry.revocableProteinIds
-        revocableIds.filter { it in earnedIds && it !in eligibleIds }.forEach {
+        AchievementRegistry.revocableWeightIds.filter { it in earnedIds && it !in eligibleWeightIds }.forEach {
             dao.deleteEarnedAchievement(it)
             earnedIds.remove(it)
         }

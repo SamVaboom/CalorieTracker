@@ -53,6 +53,13 @@ interface AppDao {
     @Delete
     suspend fun deleteRecipe(recipe: RecipeEntity)
 
+    @Transaction
+    suspend fun deleteRecipeTemplate(recipe: RecipeEntity) {
+        deleteRecipeItems(recipe.id)
+        deleteRecipe(recipe)
+        // meal_logs has no foreign key to recipes: snapshots intentionally survive.
+    }
+
     @Query("SELECT * FROM meal_logs ORDER BY dateEpochDay DESC, timeMillis DESC")
     fun observeMeals(): Flow<List<MealLogEntity>>
 

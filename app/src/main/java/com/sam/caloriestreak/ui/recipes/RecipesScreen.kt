@@ -73,7 +73,8 @@ fun RecipesScreen(
     ingredients: List<IngredientEntity>,
     recipes: List<RecipeSummary>,
     onSave: (RecipeSummary?, RecipeDraft) -> Unit,
-    onOpenIngredients: () -> Unit
+    onOpenIngredients: () -> Unit,
+    onDelete: (RecipeSummary) -> Unit = {}
 ) {
     var editing by remember { mutableStateOf<RecipeSummary?>(null) }
     var showDialog by remember { mutableStateOf(false) }
@@ -156,6 +157,11 @@ fun RecipesScreen(
             ingredients = ingredients,
             existing = editing,
             onDismiss = { showDialog = false },
+            onDelete = {
+                editing?.let(onDelete)
+                showDialog = false
+                scope.launch { snackbarHostState.showSnackbar("Recipe deleted · historical logs kept") }
+            },
             onSave = { draft ->
                 val wasEditing = editing != null
                 onSave(editing, draft)
@@ -199,6 +205,7 @@ private fun RecipeCard(
                 summary.recipe.description?.takeIf { it.isNotBlank() }?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (summary.recipe.flexibleMeal) Text("Flexible Meal · choose ingredients when logging", style = MaterialTheme.typography.labelMedium, color = AppColors.Cyan)
                 Text("${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
                 Text(
                     "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
@@ -277,6 +284,7 @@ private fun RecipeDialog(
     ingredients: List<IngredientEntity>,
     existing: RecipeSummary?,
     onDismiss: () -> Unit,
+    onDelete: () -> Unit,
     onSave: (RecipeDraft) -> Unit
 ) {
     val initial = existing?.let { RecipeDraft.from(it.recipe, it.items) } ?: RecipeDraft()
@@ -285,6 +293,8 @@ private fun RecipeDialog(
     var servings by remember(existing?.recipe?.id) { mutableStateOf(initial.servings.toString()) }
     var favorite by remember(existing?.recipe?.id) { mutableStateOf(initial.favorite) }
     var archived by remember(existing?.recipe?.id) { mutableStateOf(initial.archived) }
+    var flexibleMeal by remember(existing?.recipe?.id) { mutableStateOf(initial.flexibleMeal) }
+    var confirmDelete by remember(existing?.recipe?.id) { mutableStateOf(false) }
     var ingredientQuery by remember(existing?.recipe?.id) { mutableStateOf("") }
     var showArchivedIngredients by remember(existing?.recipe?.id) { mutableStateOf(false) }
     var confirmDiscard by remember(existing?.recipe?.id) { mutableStateOf(false) }
@@ -303,7 +313,7 @@ private fun RecipeDialog(
         )
     }
     val servingsValue = servings.toDoubleOrNull() ?: 0.0
-    val draft = RecipeDraft(name, description, servingsValue, favorite, archived, selectedItems)
+    val draft = RecipeDraft(name, description, servingsValue, favorite, archived, selectedItems, flexibleMeal)
     val totalCalories = draft.totalCalories(ingredients)
     val valid = draft.isValid(ingredients)
     val dirty = draft != initial
@@ -386,13 +396,39 @@ private fun RecipeDialog(
                         }
                     }
                 }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = flexibleMeal, onCheckedChange = { flexibleMeal = it })
+                        Column {
+                            Text("Flexible Meal", style = MaterialTheme.typography.titleMedium)
+                            Text("Choose ingredients each time you log this meal", style = MaterialTheme.typography.bodySmall)
+                            if (flexibleMeal) Text("Each saved ingredient amount is one portion. Recipe servings do not scale these portions.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(enabled = valid && !saving, onClick = { saving = true; onSave(draft) }) { Text("Save") }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = ::requestDismiss) { Text("Cancel") } }
+        dismissButton = {
+            Row {
+                if (existing != null) TextButton(enabled = !saving, onClick = { confirmDelete = true }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                TextButton(enabled = !saving, onClick = ::requestDismiss) { Text("Cancel") }
+            }
+        }
     )
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = { Text("Delete this recipe?") },
+            text = { Text("This cannot be undone. Previously logged meals will be kept.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
 
     if (confirmDiscard) {
         AlertDialog(
