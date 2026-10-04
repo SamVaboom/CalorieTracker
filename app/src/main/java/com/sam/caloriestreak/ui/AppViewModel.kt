@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sam.caloriestreak.data.local.database.DatabaseProvider
+import com.sam.caloriestreak.data.local.MealSnapshotCodec
+import com.sam.caloriestreak.domain.calculation.FlexibleMealCalculator
 import com.sam.caloriestreak.data.local.entity.DailyLogEntity
 import com.sam.caloriestreak.data.local.entity.GroceryItemEntity
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
@@ -223,7 +225,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logRecipe(summary: RecipeSummary, multiplier: Double, description: String) {
-        if (multiplier <= 0) return
+        if (summary.recipe.flexibleMeal || !multiplier.isFinite() || multiplier <= 0) return
         val recipeProtein = ProteinSummary(
             knownGrams = summary.knownProteinGrams,
             complete = summary.proteinDataComplete,
@@ -245,6 +247,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             protein = portionProtein.knownGrams.takeIf { portionProtein.hasKnownData },
             proteinComplete = portionProtein.complete,
             missingProteinItemCount = portionProtein.missingCount
+        )
+    }
+
+    fun deleteRecipe(summary: RecipeSummary) = viewModelScope.launch {
+        appDao.deleteRecipeTemplate(summary.recipe)
+    }
+
+    fun logFlexibleMeal(summary: RecipeSummary, multipliers: Map<String, Double>): Result<Unit> = runCatching {
+        require(summary.recipe.flexibleMeal)
+        val configuration = FlexibleMealCalculator.configure(summary.items, state.value.allIngredients, multipliers)
+        require(configuration.ingredients.isNotEmpty()) { "Choose at least one ingredient" }
+        val protein = configuration.protein
+        saveMeal(
+            recipeId = summary.recipe.id,
+            name = summary.recipe.name,
+            portion = "Flexible Meal",
+            multiplier = 1.0,
+            calories = configuration.calories,
+            protein = protein.knownGrams.takeIf { protein.hasKnownData },
+            proteinComplete = protein.complete,
+            missingProteinItemCount = protein.missingCount,
+            ingredientSnapshot = MealSnapshotCodec.encode(configuration.ingredients)
         )
     }
 
@@ -270,7 +294,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         calories: Double,
         protein: Double?,
         proteinComplete: Boolean,
-        missingProteinItemCount: Int
+        missingProteinItemCount: Int,
+        ingredientSnapshot: String? = null
     ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -287,6 +312,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     proteinGramsSnapshot = protein,
                     proteinDataComplete = proteinComplete,
                     missingProteinItemCount = missingProteinItemCount,
+                    ingredientSnapshot = ingredientSnapshot,
                     createdAt = now,
                     updatedAt = now
                 )

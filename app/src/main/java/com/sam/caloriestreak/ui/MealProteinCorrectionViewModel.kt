@@ -31,6 +31,7 @@ class MealProteinCorrectionViewModel(application: Application) : AndroidViewMode
     }
 
     fun recalculateRecipeProtein(meal: MealLogEntity): Result<Unit> {
+        if (meal.ingredientSnapshot != null) return Result.failure(IllegalArgumentException("Flexible meals retain their original ingredient and nutrition snapshots"))
         val recipeId = meal.recipeId ?: return Result.failure(IllegalArgumentException("This meal is not linked to a saved recipe"))
         viewModelScope.launch(Dispatchers.IO) {
             val recipe = appDao.allRecipes().firstOrNull { it.id == recipeId } ?: return@launch

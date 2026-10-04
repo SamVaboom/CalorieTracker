@@ -18,7 +18,8 @@ data class RecipeDraft(
     val servings: Double = 2.0,
     val favorite: Boolean = false,
     val archived: Boolean = false,
-    val items: List<RecipeIngredientDraft> = emptyList()
+    val items: List<RecipeIngredientDraft> = emptyList(),
+    val flexibleMeal: Boolean = false
 ) {
     fun isValid(ingredients: List<IngredientEntity>): Boolean {
         if (name.isBlank() || servings <= 0.0 || items.isEmpty()) return false
@@ -68,7 +69,8 @@ data class RecipeDraft(
             favorite = favorite,
             archived = archived,
             createdAt = existing?.createdAt ?: now,
-            updatedAt = now
+            updatedAt = now,
+            flexibleMeal = flexibleMeal
         )
     }
 
@@ -101,6 +103,7 @@ data class RecipeDraft(
             servings = recipe.servings,
             favorite = recipe.favorite,
             archived = recipe.archived,
+            flexibleMeal = recipe.flexibleMeal,
             items = items.map {
                 RecipeIngredientDraft(
                     ingredientId = it.ingredientId,

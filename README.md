@@ -120,7 +120,11 @@ The app-owned dark design system is located in `ui/theme` and `ui/components`.
 - `domain/search`: normalized case-insensitive search matching
 - `ui`: shared ViewModels, state, screens, previews and reusable components
 
-Room schema version 6 adds nullable ingredient protein and historical meal-protein snapshots through a non-destructive 5→6 migration. Schema versions 1 through 6 are committed under `app/schemas` for migration verification. Existing calories, ingredients, recipes, recipe rows, meals, grocery data, daily logs, settings, weights, achievements, streaks, freezes and popup state are preserved.
+Room schema version 7 adds an optional Flexible Meal flag (default false) and nullable historical ingredient snapshots through a non-destructive 6→7 migration. Schema versions 1 through 7 are committed under `app/schemas` for migration verification. Existing calories, protein, ingredients, recipes, recipe rows, meals, grocery data, daily logs, settings, weights, achievements, streaks, freezes and popup state are preserved.
+
+History calorie and protein lists initially collapse each day; tap a daily summary to show or hide its meals. Graph behavior and filters are unchanged. Calorie Statistics use the 7 or 30 completed calendar days ending yesterday, average only dates containing meal records, and display recorded-day coverage. An explicit zero-calorie meal is recorded data; an absent day is unknown, even when automatic score finalization created a daily record.
+
+The recipe editor supports confirmed template deletion and optional Flexible Meals. A flexible recipe's saved ingredient quantities each represent one unit, independent of recipe servings. Logging opens ingredient selection with 0.5-unit steps, live calories and known protein, and requires at least one selected ingredient. The log stores selected ingredient names, saved quantities, multipliers, units, notes and nutrition as an immutable snapshot. Later ingredient/recipe edits and template deletion never alter that snapshot. Flexible entries do not offer recalculation from the current template; ordinary recipe logging and explicit protein correction retain their existing behavior.
 
 The complete implementation requirements are committed at `docs/PROTEIN_TRACKING_IMPLEMENTATION_SPEC.txt`; the repository audit and migration rationale are in `docs/PROTEIN_IMPLEMENTATION_AUDIT.md`.
 

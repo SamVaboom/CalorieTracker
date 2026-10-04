@@ -39,6 +39,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.domain.protein.ProteinFormatter
+import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.domain.search.SearchMatcher
 import com.sam.caloriestreak.ui.RecipeSummary
 import com.sam.caloriestreak.ui.components.AppSearchField
@@ -53,9 +54,12 @@ private enum class RecipeFilter { ALL, FAVORITES }
 fun LogFoodScreen(
     recipes: List<RecipeSummary>,
     onLogRecipe: (RecipeSummary, Double, String) -> Unit,
-    onManual: (String, Double, Double?) -> Unit
+    onManual: (String, Double, Double?) -> Unit,
+    ingredients: List<IngredientEntity> = emptyList(),
+    onLogFlexible: (RecipeSummary, Map<String, Double>) -> Result<Unit> = { _, _ -> Result.failure(IllegalStateException("Logging unavailable")) }
 ) {
     var manualDialog by remember { mutableStateOf(false) }
+    var flexibleRecipe by remember { mutableStateOf<RecipeSummary?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(RecipeFilter.ALL) }
     var lastLogAt by remember { mutableLongStateOf(0L) }
@@ -151,11 +155,11 @@ fun LogFoodScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(summary.recipe.name, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "${summary.caloriesPerServing.toInt()} kcal per serving · ${summary.items.size} ingredients",
+                                    if (summary.recipe.flexibleMeal) "Flexible Meal · ${summary.items.size} possible ingredients" else "${summary.caloriesPerServing.toInt()} kcal per serving · ${summary.items.size} ingredients",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
+                                if (!summary.recipe.flexibleMeal) Text(
                                     summary.proteinPerServing?.let { "${ProteinFormatter.grams(it)} protein per serving" }
                                         ?: if (summary.knownProteinGrams > 0.0) "Protein data incomplete" else "Protein not assigned",
                                     style = MaterialTheme.typography.labelMedium,
@@ -170,14 +174,33 @@ fun LogFoodScreen(
                             modifier = Modifier.fillMaxWidth().padding(top = AppDimensions.Space8),
                             horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space4)
                         ) {
-                            TextButton(onClick = { quickLog(summary, 1.0 / summary.recipe.servings, "1 serving") }) { Text("1 serving") }
-                            TextButton(onClick = { quickLog(summary, 0.5, "Half") }) { Text("½ recipe") }
-                            TextButton(onClick = { quickLog(summary, 1.0, "Full") }) { Text("Full") }
+                            if (summary.recipe.flexibleMeal) {
+                                TextButton(onClick = { flexibleRecipe = summary }) { Text("Choose ingredients") }
+                            } else {
+                                TextButton(onClick = { quickLog(summary, 1.0 / summary.recipe.servings, "1 serving") }) { Text("1 serving") }
+                                TextButton(onClick = { quickLog(summary, 0.5, "Half") }) { Text("½ recipe") }
+                                TextButton(onClick = { quickLog(summary, 1.0, "Full") }) { Text("Full") }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    flexibleRecipe?.let { summary ->
+        FlexibleMealDialog(
+            summary = summary,
+            ingredients = ingredients,
+            onDismiss = { flexibleRecipe = null },
+            onSave = { multipliers ->
+                onLogFlexible(summary, multipliers).onSuccess {
+                    flexibleRecipe = null
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch { snackbarHostState.showSnackbar("${summary.recipe.name} added") }
+                }
+            }
+        )
     }
 
     if (manualDialog) {

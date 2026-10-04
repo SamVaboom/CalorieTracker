@@ -127,13 +127,14 @@ fun CalorieStreakNavHost(
                         onSetManualProtein = proteinCorrectionViewModel::setManualProtein
                     )
                 }
-                composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual) }
+                composable("log") { LogFoodScreen(state.recipes, appViewModel::logRecipe, appViewModel::logManual, state.allIngredients, appViewModel::logFlexibleMeal) }
                 composable("recipes") {
                     RecipesScreen(
                         ingredients = state.allIngredients,
                         recipes = state.allRecipes,
                         onSave = appViewModel::saveRecipe,
-                        onOpenIngredients = { navController.navigate("ingredients") { launchSingleTop = true } }
+                        onOpenIngredients = { navController.navigate("ingredients") { launchSingleTop = true } },
+                        onDelete = appViewModel::deleteRecipe
                     )
                 }
                 composable("history") {

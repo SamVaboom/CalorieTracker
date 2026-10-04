@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
+import com.sam.caloriestreak.data.local.MealSnapshotCodec
 import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.ui.theme.AppColors
 import com.sam.caloriestreak.ui.theme.AppDimensions
@@ -49,6 +50,16 @@ fun MealLogRow(
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space4)) {
                 Text(meal.recipeName, style = MaterialTheme.typography.titleMedium)
+                meal.ingredientSnapshot?.let { snapshot ->
+                    val ingredients = remember(snapshot) { MealSnapshotCodec.decode(snapshot) }
+                    ingredients.forEach { ingredient ->
+                        Text(
+                            "${ingredient.name} · ${ingredient.multiplier}× · ${ingredient.amount} ${ingredient.unit}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Text(
                     "${meal.portionDescription} · ${meal.calories.toInt()} kcal",
                     style = MaterialTheme.typography.bodyMedium,
@@ -67,7 +78,7 @@ fun MealLogRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (onRecalculateProtein != null || onSetManualProtein != null) {
+            if (meal.ingredientSnapshot == null && (onRecalculateProtein != null || onSetManualProtein != null)) {
                 IconButton(onClick = { editProtein = true }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit protein for ${meal.recipeName}")
                 }

@@ -1,6 +1,7 @@
 package com.sam.caloriestreak.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "recipes")
@@ -12,5 +13,6 @@ data class RecipeEntity(
     val favorite: Boolean = false,
     val archived: Boolean = false,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "0") val flexibleMeal: Boolean = false
 )

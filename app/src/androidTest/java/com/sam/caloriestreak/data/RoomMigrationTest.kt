@@ -15,6 +15,29 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RoomMigrationTest {
+    @Test fun migrateVersion6To7_preservesLogsAndDefaultsRecipesToNormal() {
+        helper.createDatabase(databaseName, 6).apply {
+            execSQL("INSERT INTO recipes VALUES ('recipe-1', 'Pizza', 'Dinner', 2.0, 1, 0, 10, 10)")
+            execSQL("INSERT INTO recipe_items VALUES ('item-1', 'recipe-1', 'ingredient-1', 'Cheese', 150.0, 'g', NULL)")
+            execSQL("INSERT INTO meal_logs (id, dateEpochDay, timeMillis, recipeId, recipeName, portionDescription, portionMultiplier, calories, proteinGramsSnapshot, proteinDataComplete, missingProteinItemCount, createdAt, updatedAt) VALUES ('meal-1', 20000, 1000, 'recipe-1', 'Pizza', '1 serving', 0.5, 420.5, 23.5, 1, 0, 1000, 1000)")
+            close()
+        }
+        val migrated = helper.runMigrationsAndValidate(databaseName, 7, true, DatabaseProvider.MIGRATION_6_7)
+        migrated.query("SELECT flexibleMeal FROM recipes").use {
+            assertTrue(it.moveToFirst())
+            assertEquals(0, it.getInt(0))
+        }
+        migrated.query("SELECT calories, proteinGramsSnapshot, proteinDataComplete, ingredientSnapshot FROM meal_logs").use {
+            assertTrue(it.moveToFirst())
+            assertEquals(420.5, it.getDouble(0), 0.0001)
+            assertEquals(23.5, it.getDouble(1), 0.0001)
+            assertEquals(1, it.getInt(2))
+            assertTrue(it.isNull(3))
+        }
+        assertSingleValue(migrated, "SELECT COUNT(*) FROM recipe_items", 1L)
+        migrated.close()
+    }
+
     private val databaseName = "room-migration-test"
 
     @get:Rule
@@ -177,12 +200,12 @@ class RoomMigrationTest {
     }
 
     private fun seedVersion2Data(db: SupportSQLiteDatabase) {
-        db.execSQL("INSERT INTO ingredients VALUES ('ingredient-1', 'Cheese', 'Brand', 280.0, 100.0, 'g', 'Dairy', 1, 0, 10, 10)")
+        db.execSQL("INSERT INTO ingredients (id, name, brand, calories, referenceAmount, referenceUnit, category, favorite, archived, createdAt, updatedAt) VALUES ('ingredient-1', 'Cheese', 'Brand', 280.0, 100.0, 'g', 'Dairy', 1, 0, 10, 10)")
         db.execSQL("INSERT INTO recipes VALUES ('recipe-1', 'Pizza', 'Dinner', 2.0, 1, 0, 10, 10)")
         db.execSQL("INSERT INTO recipe_items VALUES ('item-1', 'recipe-1', 'ingredient-1', 'Cheese', 150.0, 'g', NULL)")
-        db.execSQL("INSERT INTO meal_logs VALUES ('meal-1', 20000, 1000, 'recipe-1', 'Pizza', '1 serving', 0.5, 420.5, NULL, 1000, 1000)")
+        db.execSQL("INSERT INTO meal_logs (id, dateEpochDay, timeMillis, recipeId, recipeName, portionDescription, portionMultiplier, calories, note, createdAt, updatedAt) VALUES ('meal-1', 20000, 1000, 'recipe-1', 'Pizza', '1 serving', 0.5, 420.5, NULL, 1000, 1000)")
         db.execSQL("INSERT INTO grocery_items VALUES ('grocery-1', 'ingredient-1', 'Cheese', 150.0, 'g', 0, 0, 1000)")
-        db.execSQL("INSERT INTO daily_logs VALUES (20000, 420.5, 80.0, 1, 1, 1, 0, 0, 1000, 1000)")
+        db.execSQL("INSERT INTO daily_logs (dateEpochDay, totalCalories, score, finalized, streakSuccessful, freezeUsed, manualCheatDay, freezeQualifying, createdAt, updatedAt) VALUES (20000, 420.5, 80.0, 1, 1, 1, 0, 0, 1000, 1000)")
     }
 
     private fun assertSingleValue(db: SupportSQLiteDatabase, sql: String, expected: Long) {

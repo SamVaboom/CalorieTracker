@@ -51,6 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -73,7 +74,8 @@ fun RecipesScreen(
     ingredients: List<IngredientEntity>,
     recipes: List<RecipeSummary>,
     onSave: (RecipeSummary?, RecipeDraft) -> Unit,
-    onOpenIngredients: () -> Unit
+    onOpenIngredients: () -> Unit,
+    onDelete: (RecipeSummary) -> Unit = {}
 ) {
     var editing by remember { mutableStateOf<RecipeSummary?>(null) }
     var showDialog by remember { mutableStateOf(false) }
@@ -156,6 +158,11 @@ fun RecipesScreen(
             ingredients = ingredients,
             existing = editing,
             onDismiss = { showDialog = false },
+            onDelete = {
+                editing?.let(onDelete)
+                showDialog = false
+                scope.launch { snackbarHostState.showSnackbar("Recipe deleted · historical logs kept") }
+            },
             onSave = { draft ->
                 val wasEditing = editing != null
                 onSave(editing, draft)
@@ -199,9 +206,10 @@ private fun RecipeCard(
                 summary.recipe.description?.takeIf { it.isNotBlank() }?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
+                if (summary.recipe.flexibleMeal) Text("Flexible Meal · choose ingredients when logging", style = MaterialTheme.typography.labelMedium, color = AppColors.Cyan)
+                Text(if (summary.recipe.flexibleMeal) "${summary.totalCalories.toInt()} kcal in ingredient pool" else "${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
                 Text(
-                    "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
+                    if (summary.recipe.flexibleMeal) "${summary.items.size} possible ingredients · amounts chosen when logging" else "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -246,9 +254,10 @@ private fun RecipeCard(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text("${summary.totalCalories.toInt()} kcal total · ${summary.caloriesPerServing.toInt()} kcal per serving", modifier = Modifier.padding(top = AppDimensions.Space12))
+                Text(if (summary.recipe.flexibleMeal) "${summary.totalCalories.toInt()} kcal with every ingredient at 1×" else "${summary.totalCalories.toInt()} kcal total · ${summary.caloriesPerServing.toInt()} kcal per serving", modifier = Modifier.padding(top = AppDimensions.Space12))
                 Text(
                     when {
+                        summary.recipe.flexibleMeal && summary.proteinDataComplete -> "${ProteinFormatter.grams(summary.knownProteinGrams)} protein with every ingredient at 1×"
                         summary.proteinDataComplete -> "${ProteinFormatter.grams(summary.knownProteinGrams)} total · ${ProteinFormatter.grams(summary.proteinPerServing ?: 0.0)} per serving"
                         summary.knownProteinGrams > 0.0 -> "${ProteinFormatter.grams(summary.knownProteinGrams)} known protein"
                         else -> "Protein not assigned"
@@ -277,6 +286,7 @@ private fun RecipeDialog(
     ingredients: List<IngredientEntity>,
     existing: RecipeSummary?,
     onDismiss: () -> Unit,
+    onDelete: () -> Unit,
     onSave: (RecipeDraft) -> Unit
 ) {
     val initial = existing?.let { RecipeDraft.from(it.recipe, it.items) } ?: RecipeDraft()
@@ -285,6 +295,8 @@ private fun RecipeDialog(
     var servings by remember(existing?.recipe?.id) { mutableStateOf(initial.servings.toString()) }
     var favorite by remember(existing?.recipe?.id) { mutableStateOf(initial.favorite) }
     var archived by remember(existing?.recipe?.id) { mutableStateOf(initial.archived) }
+    var flexibleMeal by remember(existing?.recipe?.id) { mutableStateOf(initial.flexibleMeal) }
+    var confirmDelete by remember(existing?.recipe?.id) { mutableStateOf(false) }
     var ingredientQuery by remember(existing?.recipe?.id) { mutableStateOf("") }
     var showArchivedIngredients by remember(existing?.recipe?.id) { mutableStateOf(false) }
     var confirmDiscard by remember(existing?.recipe?.id) { mutableStateOf(false) }
@@ -303,7 +315,7 @@ private fun RecipeDialog(
         )
     }
     val servingsValue = servings.toDoubleOrNull() ?: 0.0
-    val draft = RecipeDraft(name, description, servingsValue, favorite, archived, selectedItems)
+    val draft = RecipeDraft(name, description, servingsValue, favorite, archived, selectedItems, flexibleMeal)
     val totalCalories = draft.totalCalories(ingredients)
     val valid = draft.isValid(ingredients)
     val dirty = draft != initial
@@ -315,13 +327,13 @@ private fun RecipeDialog(
 
     fun requestDismiss() { if (dirty) confirmDiscard = true else onDismiss() }
 
-    AlertDialog(
+    if (!confirmDelete) AlertDialog(
         onDismissRequest = { if (!saving) requestDismiss() },
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.extraLarge,
         title = { Text(if (existing == null) "Add Recipe" else "Edit Recipe") },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
+            LazyColumn(Modifier.testTag("recipe_editor_content"), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
                 item { Text("Basic information", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
                 item { OutlinedTextField(name, { name = it }, label = { Text("Recipe name") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
                 item { OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
@@ -386,13 +398,39 @@ private fun RecipeDialog(
                         }
                     }
                 }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = flexibleMeal, onCheckedChange = { flexibleMeal = it }, modifier = Modifier.semantics { contentDescription = "Flexible Meal" })
+                        Column {
+                            Text("Flexible Meal", style = MaterialTheme.typography.titleMedium)
+                            Text("Choose ingredients each time you log this meal", style = MaterialTheme.typography.bodySmall)
+                            if (flexibleMeal) Text("Each saved ingredient amount is one portion. Recipe servings do not scale these portions.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(enabled = valid && !saving, onClick = { saving = true; onSave(draft) }) { Text("Save") }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = ::requestDismiss) { Text("Cancel") } }
+        dismissButton = {
+            Row {
+                if (existing != null) TextButton(enabled = !saving, onClick = { confirmDelete = true }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                TextButton(enabled = !saving, onClick = ::requestDismiss) { Text("Cancel") }
+            }
+        }
     )
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = { Text("Delete this recipe?") },
+            text = { Text("This cannot be undone. Previously logged meals will be kept.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
 
     if (confirmDiscard) {
         AlertDialog(

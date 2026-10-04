@@ -17,7 +17,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.espresso.Espresso.pressBack
+import android.view.KeyEvent
+import androidx.test.platform.app.InstrumentationRegistry
 import com.sam.caloriestreak.data.local.entity.AchievementPopupSummaryEntity
 import com.sam.caloriestreak.data.local.entity.EarnedAchievementEntity
 import com.sam.caloriestreak.ui.theme.CalorieStreakTheme
@@ -80,7 +81,9 @@ class AchievementPopupHostTest {
                 )
             }
         }
-        pressBack()
+        composeRule.onNodeWithTag("achievement_popup_card").assertIsDisplayed()
+        // Send Android Back to the focused dialog, rather than Espresso's activity root.
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         composeRule.waitForIdle()
         composeRule.onAllNodesWithTag("achievement_popup_card").assertCountEquals(0)
     }
@@ -114,3 +117,4 @@ class AchievementPopupHostTest {
         composeRule.onAllNodesWithText("Bullseye").assertCountEquals(0)
     }
 }
+

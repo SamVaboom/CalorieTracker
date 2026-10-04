@@ -21,5 +21,7 @@ data class MealLogEntity(
     @ColumnInfo(defaultValue = "0") val missingProteinItemCount: Int = 0,
     val note: String? = null,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    /** Immutable ingredient configuration; null for legacy and normal meals. */
+    val ingredientSnapshot: String? = null
 )

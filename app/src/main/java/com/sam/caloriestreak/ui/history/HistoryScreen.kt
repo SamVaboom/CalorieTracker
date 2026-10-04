@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -249,6 +250,7 @@ private fun CalorieHistoryList(
     range: HistoryRange,
     onDelete: (MealLogEntity) -> Unit
 ) {
+    var expandedDays by rememberSaveable { mutableStateOf(emptyList<Long>()) }
     val today = LocalDate.now().toEpochDay()
     val cutoff = range.dayCount?.let { today - it + 1 }
     val mealsByDay = remember(meals) { meals.groupBy { it.dateEpochDay } }
@@ -272,7 +274,9 @@ private fun CalorieHistoryList(
             val score = daily?.score ?: ScoreCalculator.forTarget(targetCalories).calculate(total)
             item(key = "day-$day") {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable(
+                        onClickLabel = if (day in expandedDays) "Collapse day" else "Expand day"
+                    ) { expandedDays = if (day in expandedDays) expandedDays - day else expandedDays + day },
                     shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     border = BorderStroke(1.dp, scoreColor(score).copy(alpha = 0.35f))
@@ -283,6 +287,10 @@ private fun CalorieHistoryList(
                             Text("${ScoreDisplay.percent(score)}%", style = MaterialTheme.typography.titleMedium, color = scoreColor(score))
                         }
                         Text("${total.toInt()} kcal · ${dayMeals.size} entries", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = AppDimensions.Space4))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(ProteinFormatter.known(DailyProteinCalculator.calculate(dayMeals)), style = MaterialTheme.typography.labelMedium, color = AppColors.Cyan)
+                            Icon(if (day in expandedDays) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = if (day in expandedDays) "Collapse day" else "Expand day")
+                        }
                         when {
                             daily?.manualCheatDay == true -> Text("Manual freeze day", color = AppColors.Freeze, modifier = Modifier.padding(top = AppDimensions.Space4))
                             daily?.freezeUsed == true -> Text("Freeze protected", color = AppColors.Freeze, modifier = Modifier.padding(top = AppDimensions.Space4))
@@ -291,7 +299,9 @@ private fun CalorieHistoryList(
                     }
                 }
             }
-            items(dayMeals, key = { it.id }) { meal -> MealLogRow(meal = meal, onDelete = onDelete) }
+            if (day in expandedDays) {
+                items(dayMeals, key = { it.id }) { meal -> MealLogRow(meal = meal, onDelete = onDelete) }
+            }
         }
     }
 }
@@ -380,6 +390,7 @@ private fun WeightGraphMode(weights: List<WeightEntryEntity>, weightGoal: Double
 
 @Composable
 private fun ProteinHistoryList(meals: List<MealLogEntity>, range: HistoryRange) {
+    var expandedDays by rememberSaveable { mutableStateOf(emptyList<Long>()) }
     val today = LocalDate.now().toEpochDay()
     val cutoff = range.dayCount?.let { today - it + 1 }
     val days = remember(meals, range, today) {
@@ -397,8 +408,14 @@ private fun ProteinHistoryList(meals: List<MealLogEntity>, range: HistoryRange) 
         days.forEach { (day, dayMeals) ->
             val summary = DailyProteinCalculator.calculate(dayMeals)
             item(key = "protein-day-$day") {
-                AppCard(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth().clickable(
+                    onClickLabel = if (day in expandedDays) "Collapse day" else "Expand day"
+                ) { expandedDays = if (day in expandedDays) expandedDays - day else expandedDays + day }) {
                     Text(LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy")), style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${dayMeals.size} entries", style = MaterialTheme.typography.labelMedium)
+                        Icon(if (day in expandedDays) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = if (day in expandedDays) "Collapse day" else "Expand day")
+                    }
                     Text(
                         ProteinFormatter.known(summary),
                         color = if (summary.complete) AppColors.Cyan else AppColors.Warning,
@@ -413,7 +430,7 @@ private fun ProteinHistoryList(meals: List<MealLogEntity>, range: HistoryRange) 
                     }
                 }
             }
-            items(dayMeals, key = { "protein-${it.id}" }) { meal ->
+            if (day in expandedDays) items(dayMeals, key = { "protein-${it.id}" }) { meal ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = MaterialTheme.shapes.medium) {
                     Row(Modifier.fillMaxWidth().padding(AppDimensions.Space12), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(meal.recipeName, modifier = Modifier.weight(1f))

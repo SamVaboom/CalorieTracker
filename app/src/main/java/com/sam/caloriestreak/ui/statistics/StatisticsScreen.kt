@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.domain.calculation.ScoreCalculator
+import com.sam.caloriestreak.domain.calculation.CalorieStatisticsCalculator
 import com.sam.caloriestreak.domain.calculation.ScoreDisplay
 import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.domain.protein.ProteinRangeStatistics
@@ -61,10 +62,10 @@ fun StatisticsScreen(
     val calculator = remember(targetCalories) { ScoreCalculator.forTarget(targetCalories) }
     val byDay = remember(meals) { meals.groupBy { it.dateEpochDay }.mapValues { (_, values) -> values.sumOf { it.calories } } }
     val today = LocalDate.now().toEpochDay()
-    val last7 = (0L..6L).map { byDay[today - it] ?: 0.0 }
-    val last30 = (0L..29L).map { byDay[today - it] ?: 0.0 }
-    val average7Score = ScoreDisplay.percent(last7.map(calculator::calculate).average())
-    val average30Score = ScoreDisplay.percent(last30.map(calculator::calculate).average())
+    val last7 = CalorieStatisticsCalculator.completedDays(meals, today, 7)
+    val last30 = CalorieStatisticsCalculator.completedDays(meals, today, 30)
+    val average7Score = last7.averageScore(calculator)?.let { "${ScoreDisplay.percent(it)}%" } ?: "—"
+    val average30Score = last30.averageScore(calculator)?.let { "${ScoreDisplay.percent(it)}%" } ?: "—"
     val completion = if (totalAchievements > 0) earnedAchievements * 100 / totalAchievements else 0
     val protein = remember(meals, ingredients, today) {
         ProteinStatisticsCalculator.calculate(meals, ingredients, today)
@@ -89,11 +90,11 @@ fun StatisticsScreen(
         }
 
         if (section == StatisticsSection.ALL || section == StatisticsSection.CALORIES) {
-            item { AppSectionHeader("Calories", subtitle = "Averages use the existing app calculation") }
+            item { AppSectionHeader("Calories", subtitle = "Completed calendar days only · through yesterday") }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)) {
-                    AppStatCard("7-day score", "$average7Score%", Modifier.weight(1f), "${last7.average().toInt()} kcal/day", AppColors.Cyan)
-                    AppStatCard("30-day score", "$average30Score%", Modifier.weight(1f), "${last30.average().toInt()} kcal/day", AppColors.Violet)
+                    AppStatCard("7-day score", average7Score, Modifier.weight(1f), "${last7.averageCalories?.toInt()?.toString() ?: "—"} kcal/day\n${last7.recordedDays}/7 days recorded", AppColors.Cyan)
+                    AppStatCard("30-day score", average30Score, Modifier.weight(1f), "${last30.averageCalories?.toInt()?.toString() ?: "—"} kcal/day\n${last30.recordedDays}/30 days recorded", AppColors.Violet)
                 }
             }
             item {
