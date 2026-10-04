@@ -1,6 +1,10 @@
 package com.sam.caloriestreak.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
@@ -26,7 +30,12 @@ class DarkThemeVisualSmokeTest {
     @get:Rule val composeRule = createComposeRule()
 
     private fun assertScreenRemainsDark(content: @Composable () -> Unit) {
-        composeRule.setContent { CalorieStreakTheme { content() } }
+        // Standalone screens normally inherit this background from the navigation Scaffold.
+        composeRule.setContent {
+            CalorieStreakTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
+            }
+        }
         composeRule.waitForIdle()
         val pixels = composeRule.onRoot().captureToImage().toPixelMap()
         val sampleXs = listOf(0, pixels.width / 4, pixels.width / 2, pixels.width * 3 / 4, pixels.width - 1)

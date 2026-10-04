@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.compose.ui.test.hasText
 import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
@@ -118,9 +120,11 @@ class RecipesExpansionTest {
             }
         }
         composeRule.onNodeWithContentDescription("Edit Aubergine Pizza").performClick()
-        composeRule.onAllNodesWithText("Mozzarella").assertCountEquals(0)
         composeRule.runOnIdle { assertEquals(0, editCount) }
         composeRule.onNodeWithText("Edit Recipe").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onAllNodesWithText("Mozzarella").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Expand Aubergine Pizza").assertIsDisplayed()
     }
 
     @Test fun expansionStateStaysAttachedToStableRecipeIdAcrossSearch() {
@@ -134,7 +138,8 @@ class RecipesExpansionTest {
         composeRule.onNode(hasSetTextAction()).performTextInput("Soup")
         composeRule.onAllNodesWithText("Aubergine Pizza").assertCountEquals(0)
         composeRule.onNodeWithContentDescription("Clear search").performClick()
-        composeRule.onNodeWithText("Mozzarella").assertIsDisplayed()
+        closeSoftKeyboard()
+        composeRule.onNodeWithText("Mozzarella").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Collapse Aubergine Pizza").assertIsDisplayed()
     }
 }

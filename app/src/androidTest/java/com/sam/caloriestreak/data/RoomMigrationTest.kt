@@ -17,8 +17,9 @@ import org.junit.runner.RunWith
 class RoomMigrationTest {
     @Test fun migrateVersion6To7_preservesLogsAndDefaultsRecipesToNormal() {
         helper.createDatabase(databaseName, 6).apply {
-            seedVersion2Data(this)
-            execSQL("UPDATE meal_logs SET proteinGramsSnapshot = 23.5, proteinDataComplete = 1")
+            execSQL("INSERT INTO recipes VALUES ('recipe-1', 'Pizza', 'Dinner', 2.0, 1, 0, 10, 10)")
+            execSQL("INSERT INTO recipe_items VALUES ('item-1', 'recipe-1', 'ingredient-1', 'Cheese', 150.0, 'g', NULL)")
+            execSQL("INSERT INTO meal_logs (id, dateEpochDay, timeMillis, recipeId, recipeName, portionDescription, portionMultiplier, calories, proteinGramsSnapshot, proteinDataComplete, missingProteinItemCount, createdAt, updatedAt) VALUES ('meal-1', 20000, 1000, 'recipe-1', 'Pizza', '1 serving', 0.5, 420.5, 23.5, 1, 0, 1000, 1000)")
             close()
         }
         val migrated = helper.runMigrationsAndValidate(databaseName, 7, true, DatabaseProvider.MIGRATION_6_7)
