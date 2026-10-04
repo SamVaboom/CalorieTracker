@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
-import com.sam.caloriestreak.domain.calculation.FlexibleMealCalculator
 import com.sam.caloriestreak.domain.search.SearchMatcher
 import com.sam.caloriestreak.ui.RecipeSummary
 import com.sam.caloriestreak.ui.components.AppSearchField

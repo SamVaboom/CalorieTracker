@@ -207,9 +207,9 @@ private fun RecipeCard(
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (summary.recipe.flexibleMeal) Text("Flexible Meal · choose ingredients when logging", style = MaterialTheme.typography.labelMedium, color = AppColors.Cyan)
-                Text("${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
+                Text(if (summary.recipe.flexibleMeal) "${summary.totalCalories.toInt()} kcal in ingredient pool" else "${summary.caloriesPerServing.toInt()} kcal per serving", style = MaterialTheme.typography.bodyLarge, color = AppColors.Coral)
                 Text(
-                    "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
+                    if (summary.recipe.flexibleMeal) "${summary.items.size} possible ingredients · amounts chosen when logging" else "${summary.items.size} ingredients · ${summary.recipe.servings} servings · ${summary.totalCalories.toInt()} kcal total",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -254,9 +254,10 @@ private fun RecipeCard(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text("${summary.totalCalories.toInt()} kcal total · ${summary.caloriesPerServing.toInt()} kcal per serving", modifier = Modifier.padding(top = AppDimensions.Space12))
+                Text(if (summary.recipe.flexibleMeal) "${summary.totalCalories.toInt()} kcal with every ingredient at 1×" else "${summary.totalCalories.toInt()} kcal total · ${summary.caloriesPerServing.toInt()} kcal per serving", modifier = Modifier.padding(top = AppDimensions.Space12))
                 Text(
                     when {
+                        summary.recipe.flexibleMeal && summary.proteinDataComplete -> "${ProteinFormatter.grams(summary.knownProteinGrams)} protein with every ingredient at 1×"
                         summary.proteinDataComplete -> "${ProteinFormatter.grams(summary.knownProteinGrams)} total · ${ProteinFormatter.grams(summary.proteinPerServing ?: 0.0)} per serving"
                         summary.knownProteinGrams > 0.0 -> "${ProteinFormatter.grams(summary.knownProteinGrams)} known protein"
                         else -> "Protein not assigned"
@@ -326,7 +327,7 @@ private fun RecipeDialog(
 
     fun requestDismiss() { if (dirty) confirmDiscard = true else onDismiss() }
 
-    AlertDialog(
+    if (!confirmDelete) AlertDialog(
         onDismissRequest = { if (!saving) requestDismiss() },
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.extraLarge,

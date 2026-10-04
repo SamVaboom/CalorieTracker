@@ -12,8 +12,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.hasAnyAncestor
 import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
