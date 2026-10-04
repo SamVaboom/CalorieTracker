@@ -51,6 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -331,7 +332,7 @@ private fun RecipeDialog(
         shape = MaterialTheme.shapes.extraLarge,
         title = { Text(if (existing == null) "Add Recipe" else "Edit Recipe") },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
+            LazyColumn(Modifier.testTag("recipe_editor_content"), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
                 item { Text("Basic information", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
                 item { OutlinedTextField(name, { name = it }, label = { Text("Recipe name") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
                 item { OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
@@ -398,7 +399,7 @@ private fun RecipeDialog(
                 }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = flexibleMeal, onCheckedChange = { flexibleMeal = it })
+                        Checkbox(checked = flexibleMeal, onCheckedChange = { flexibleMeal = it }, modifier = Modifier.semantics { contentDescription = "Flexible Meal" })
                         Column {
                             Text("Flexible Meal", style = MaterialTheme.typography.titleMedium)
                             Text("Choose ingredients each time you log this meal", style = MaterialTheme.typography.bodySmall)

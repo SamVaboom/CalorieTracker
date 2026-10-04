@@ -10,6 +10,8 @@ import com.sam.caloriestreak.data.local.entity.MealLogEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
 import com.sam.caloriestreak.domain.protein.DailyProteinCalculator
+import com.sam.caloriestreak.domain.calculation.FlexibleMealCalculator
+import com.sam.caloriestreak.data.local.MealSnapshotCodec
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,6 +22,33 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MealProteinSnapshotPersistenceTest {
+    @Test fun flexibleSnapshotAndNormalLogSurviveSourceEditAndDeletion() = runBlocking {
+        val ingredient = IngredientEntity("rice", "Rice", calories = 130.0, referenceAmount = 100.0, referenceUnit = "g", proteinPerReferenceAmount = 3.0, createdAt = 1, updatedAt = 1)
+        val recipe = RecipeEntity("recipe", "Burrito", createdAt = 1, updatedAt = 1, flexibleMeal = true)
+        val item = RecipeItemEntity("row", "recipe", "rice", "Rice", 100.0, "g")
+        database.ingredientDao().upsert(ingredient)
+        database.appDao().replaceRecipe(recipe, listOf(item))
+        val configured = FlexibleMealCalculator.configure(listOf(item), listOf(ingredient), mapOf("row" to 1.5))
+        val snapshot = MealSnapshotCodec.encode(configured.ingredients)
+        val logged = meal("recipe-flexible", 4.5, true).copy(calories = 195.0, ingredientSnapshot = snapshot)
+        val normal = meal("recipe-normal", 3.0, true)
+        database.appDao().upsertMeal(logged)
+        database.appDao().upsertMeal(normal)
+        database.appDao().replaceRecipe(recipe.copy(name = "Changed", flexibleMeal = false), listOf(item.copy(amount = 999.0)))
+        database.ingredientDao().upsert(ingredient.copy(name = "Renamed", calories = 999.0, proteinPerReferenceAmount = null))
+        assertEquals(logged, database.appDao().allMeals().first { it.id == logged.id })
+        database.appDao().deleteRecipeTemplate(recipe)
+        assertEquals(emptyList<RecipeEntity>(), database.appDao().allRecipes())
+        assertEquals(emptyList<RecipeItemEntity>(), database.appDao().allRecipeItems())
+        val meals = database.appDao().allMeals().associateBy { it.id }
+        assertEquals(logged, meals[logged.id])
+        assertEquals(normal, meals[normal.id])
+        val restored = MealSnapshotCodec.decode(meals.getValue(logged.id).ingredientSnapshot!!).single()
+        assertEquals("Rice", restored.name)
+        assertEquals(150.0, restored.amount, 0.001)
+        assertEquals(4.5, restored.proteinGrams!!, 0.001)
+    }
+
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var database: CalorieStreakDatabase
 

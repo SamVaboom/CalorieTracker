@@ -9,6 +9,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.hasAnyAncestor
+import com.sam.caloriestreak.domain.editing.RecipeDraft
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.data.local.entity.RecipeEntity
 import com.sam.caloriestreak.data.local.entity.RecipeItemEntity
@@ -20,6 +26,31 @@ import org.junit.Rule
 import org.junit.Test
 
 class RecipesExpansionTest {
+    @Test fun deletionRequiresConfirmationAndCanBeCancelled() {
+        var deleted = 0
+        composeRule.setContent { CalorieStreakTheme { RecipesScreen(listOf(cheese, sauce), listOf(pizza()), { _, _ -> }, {}, { deleted++ }) } }
+        composeRule.onNodeWithContentDescription("Edit Aubergine Pizza").performClick()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.runOnIdle { assertEquals(0, deleted) }
+        composeRule.onNodeWithText("Delete this recipe?").assertIsDisplayed()
+        // The confirmation dialog is the only active semantics window.
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.runOnIdle { assertEquals(0, deleted) }
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.runOnIdle { assertEquals(1, deleted) }
+    }
+
+    @Test fun editorCanEnableFlexibleMeal() {
+        var saved: RecipeDraft? = null
+        composeRule.setContent { CalorieStreakTheme { RecipesScreen(listOf(cheese, sauce), listOf(pizza()), { _, draft -> saved = draft }, {}) } }
+        composeRule.onNodeWithContentDescription("Edit Aubergine Pizza").performClick()
+        composeRule.onNodeWithTag("recipe_editor_content").performScrollToNode(hasText("Flexible Meal"))
+        composeRule.onNodeWithContentDescription("Flexible Meal").performClick()
+        composeRule.onNodeWithText("Save").performClick()
+        composeRule.runOnIdle { assertEquals(true, saved?.flexibleMeal) }
+    }
+
     @get:Rule val composeRule = createComposeRule()
 
     private val cheese = IngredientEntity(
