@@ -1,6 +1,7 @@
 package com.sam.caloriestreak.ui.ingredients
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,12 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,10 +41,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sam.caloriestreak.data.local.entity.IngredientEntity
 import com.sam.caloriestreak.domain.editing.IngredientDraft
+import com.sam.caloriestreak.domain.protein.ProteinFormatter
 import com.sam.caloriestreak.domain.search.SearchMatcher
 import com.sam.caloriestreak.ui.components.AppEmptyState
 import com.sam.caloriestreak.ui.components.AppSearchField
@@ -49,6 +52,10 @@ import com.sam.caloriestreak.ui.components.AppSectionHeader
 import com.sam.caloriestreak.ui.theme.AppColors
 import com.sam.caloriestreak.ui.theme.AppDimensions
 import kotlinx.coroutines.launch
+
+internal enum class ProteinAssignmentFilter(val label: String) {
+    ALL("All"), MISSING("Protein missing"), ASSIGNED("Protein assigned")
+}
 
 @Composable
 fun IngredientsScreen(
@@ -60,14 +67,24 @@ fun IngredientsScreen(
     var editing by remember { mutableStateOf<IngredientEntity?>(null) }
     var showDialog by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
+    var proteinFilter by remember { mutableStateOf(ProteinAssignmentFilter.ALL) }
     var query by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<IngredientEntity?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val filtered = remember(ingredients, query, showArchived) {
-        ingredients.filter { showArchived || !it.archived }
-            .filter { SearchMatcher.matches(query, it.name, it.brand, it.category) }
+    val filtered = remember(ingredients, query, showArchived, proteinFilter) {
+        ingredients.asSequence()
+            .filter { showArchived || !it.archived }
+            .filter {
+                when (proteinFilter) {
+                    ProteinAssignmentFilter.ALL -> true
+                    ProteinAssignmentFilter.MISSING -> it.proteinPerReferenceAmount == null
+                    ProteinAssignmentFilter.ASSIGNED -> it.proteinPerReferenceAmount != null
+                }
+            }
+            .filter { SearchMatcher.matches(query, it.name, it.category) }
             .sortedWith(compareByDescending<IngredientEntity> { it.favorite }.thenBy { it.archived }.thenBy { it.name.lowercase() })
+            .toList()
     }
 
     Scaffold(
@@ -89,25 +106,37 @@ fun IngredientsScreen(
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        AppSectionHeader("Ingredients", subtitle = "Reusable calorie references for recipes")
+                        AppSectionHeader("Ingredients", subtitle = "Reusable calorie and protein references")
                     }
                     IconButton(onClick = onOpenRecipes) { Icon(Icons.Outlined.MenuBook, contentDescription = "Open recipes") }
                 }
             }
             item { AppSearchField(query = query, onQueryChange = { query = it }, label = "Search ingredients") }
             item {
-                FilterChip(
-                    selected = showArchived,
-                    onClick = { showArchived = !showArchived },
-                    label = { Text("Show archived") }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(AppDimensions.Space8)
+                ) {
+                    ProteinAssignmentFilter.entries.forEach { option ->
+                        FilterChip(
+                            selected = proteinFilter == option,
+                            onClick = { proteinFilter = option },
+                            label = { Text(option.label) }
+                        )
+                    }
+                    FilterChip(
+                        selected = showArchived,
+                        onClick = { showArchived = !showArchived },
+                        label = { Text("Show archived") }
+                    )
+                }
             }
             if (filtered.isEmpty()) {
                 item {
                     AppEmptyState(
                         icon = Icons.Outlined.Inventory2,
-                        title = if (query.isBlank()) "No ingredients yet" else "No matching ingredients",
-                        message = if (query.isBlank()) "Add an ingredient to start building recipes." else "Try another search term."
+                        title = if (query.isBlank()) "No ingredients in this filter" else "No matching ingredients",
+                        message = if (query.isBlank()) "Add an ingredient or choose another protein filter." else "Try another search term."
                     )
                 }
             }
@@ -116,7 +145,14 @@ fun IngredientsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    border = BorderStroke(1.dp, if (ingredient.favorite) AppColors.Violet.copy(alpha = 0.42f) else MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(
+                        1.dp,
+                        when {
+                            ingredient.proteinPerReferenceAmount == null -> AppColors.Warning.copy(alpha = 0.45f)
+                            ingredient.favorite -> AppColors.Violet.copy(alpha = 0.42f)
+                            else -> MaterialTheme.colorScheme.outlineVariant
+                        }
+                    )
                 ) {
                     Row(Modifier.fillMaxWidth().padding(AppDimensions.Space16), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppDimensions.Space4)) {
@@ -125,9 +161,6 @@ fun IngredientsScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (ingredient.archived) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
-                            ingredient.brand?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
                             ingredient.category?.takeIf { it.isNotBlank() }?.let {
                                 Text(it, style = MaterialTheme.typography.labelMedium, color = AppColors.Cyan)
                             }
@@ -136,6 +169,21 @@ fun IngredientsScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = AppColors.Coral
                             )
+                            ingredient.proteinPerReferenceAmount?.let { protein ->
+                                Text(
+                                    "${ProteinFormatter.grams(protein)} protein / ${ingredient.referenceAmount} ${ingredient.referenceUnit}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppColors.Cyan
+                                )
+                            } ?: Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = AppColors.Warning)
+                                Text(
+                                    "Protein not assigned",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppColors.Warning,
+                                    modifier = Modifier.padding(start = AppDimensions.Space4)
+                                )
+                            }
                         }
                         IconButton(onClick = { editing = ingredient; showDialog = true }) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Edit ${ingredient.name}")
@@ -185,17 +233,20 @@ private fun IngredientDialog(
 ) {
     val initial = existing?.let(IngredientDraft::from) ?: IngredientDraft()
     var name by remember(existing?.id) { mutableStateOf(initial.name) }
-    var brand by remember(existing?.id) { mutableStateOf(initial.brand) }
     var calories by remember(existing?.id) { mutableStateOf(initial.calories.toString()) }
     var amount by remember(existing?.id) { mutableStateOf(initial.referenceAmount.toString()) }
     var unit by remember(existing?.id) { mutableStateOf(initial.referenceUnit) }
+    var protein by remember(existing?.id) { mutableStateOf(initial.proteinPerReferenceAmount?.toString().orEmpty()) }
     var category by remember(existing?.id) { mutableStateOf(initial.category) }
     var favorite by remember(existing?.id) { mutableStateOf(initial.favorite) }
     var archived by remember(existing?.id) { mutableStateOf(initial.archived) }
     var saving by remember(existing?.id) { mutableStateOf(false) }
     val caloriesValue = calories.toDoubleOrNull()
     val amountValue = amount.toDoubleOrNull()
-    val valid = name.isNotBlank() && caloriesValue != null && caloriesValue >= 0.0 && amountValue != null && amountValue > 0.0 && unit.isNotBlank()
+    val proteinValue = protein.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+    val valid = name.isNotBlank() && caloriesValue != null && caloriesValue >= 0.0 &&
+        amountValue != null && amountValue > 0.0 && unit.isNotBlank() &&
+        (protein.isBlank() || (proteinValue != null && proteinValue >= 0.0))
 
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
@@ -206,12 +257,25 @@ private fun IngredientDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimensions.Space12)) {
                 item { Text("Basic information", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
                 item { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { OutlinedTextField(brand, { brand = it }, label = { Text("Brand") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
                 item { OutlinedTextField(category, { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { Text("Calorie basis", style = MaterialTheme.typography.titleMedium, color = AppColors.Coral, modifier = Modifier.padding(top = AppDimensions.Space8)) }
+                item { Text("Reference nutrition", style = MaterialTheme.typography.titleMedium, color = AppColors.Coral, modifier = Modifier.padding(top = AppDimensions.Space8)) }
                 item { OutlinedTextField(calories, { calories = it }, label = { Text("Calories") }, suffix = { Text("kcal") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { OutlinedTextField(amount, { amount = it }, label = { Text("Reference amount") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { OutlinedTextField(unit, { unit = it }, label = { Text("Reference unit") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item { OutlinedTextField(amount, { amount = it }, label = { Text("Reference quantity") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item { OutlinedTextField(unit, { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item {
+                    OutlinedTextField(
+                        value = protein,
+                        onValueChange = { protein = it },
+                        label = { Text("Protein") },
+                        suffix = { Text("g") },
+                        supportingText = {
+                            Text(if (protein.isBlank()) "Protein not assigned" else "For the same reference quantity")
+                        },
+                        isError = protein.isNotBlank() && (proteinValue == null || proteinValue < 0.0),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = favorite, onCheckedChange = { favorite = it })
@@ -234,10 +298,10 @@ private fun IngredientDialog(
                     onSave(
                         IngredientDraft(
                             name = name,
-                            brand = brand,
                             calories = requireNotNull(caloriesValue),
                             referenceAmount = requireNotNull(amountValue),
                             referenceUnit = unit,
+                            proteinPerReferenceAmount = proteinValue,
                             category = category,
                             favorite = favorite,
                             archived = archived
